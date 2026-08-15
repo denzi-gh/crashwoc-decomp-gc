@@ -190,7 +190,7 @@ struct debkeydatatype_s
     float toffz; // Offset: 0x2A4, DWARF: 0x374EA
     // Size: 0x20, DWARF: 0x1EBCB
     struct uv1deb*(*genptr)(); // Offset: 0x2A8, DWARF: 0x37512
-    void* gencode; // Offset: 0x2AC, DWARF: 0x37540
+    void (*gencode)(); // Offset: 0x2AC, DWARF: 0x37540
     struct debkeydatatype_s* next; // Offset: 0x2B0, DWARF: 0x3756F
     struct debkeydatatype_s* prev; // Offset: 0x2B4, DWARF: 0x3759B
     short rotory; // Offset: 0x2B8, DWARF: 0x375C7
