@@ -97,12 +97,21 @@ void NuTexDestroy(s32 id)
 
 u32 NuTexUnRef(s32 id)
 {
-	id--;
-	if (id < 0)
-	{
-		return NULL;
-	}
-	return --tinfo[id].ref;
+  int new_var;
+  new_var = 0;
+  id--;
+  if (id < new_var)
+  {
+    if (new_var || id)
+    {
+      return (void *) new_var;
+    }
+    else
+    {
+      return (void *) new_var;
+    }
+  }
+  return --tinfo[id].ref;
 }
 
 s32 NuTexPixelSize(enum nutextype_e type) {

@@ -47,29 +47,35 @@ void NuVecInvMtxRotate(struct nuvec_s* dest, struct nuvec_s* a, struct Mtx* b)
 
 void NuVecRotateX(struct nuvec_s* dest, struct nuvec_s* v, s32 angle)
 {
-	f32 s = ANG_SIN(angle);
-	f32 c = ANG_COS(angle);
-	dest->x = v->x;
-	dest->y = v->y * c - v->z * s;
-	dest->z = v->y * s + v->z * c;
+  f32 c = NuTrigTable[(u16) (angle + 0x4000)];
+  f32 s = NuTrigTable[(u16) angle];
+  f32 new_var;
+  new_var = v->y;
+  dest->x = v->x;
+  dest->y = (new_var * c) - (v->z * s);
+  dest->z = (new_var * s) + (v->z * c);
 }
 
 void NuVecRotateY(struct nuvec_s* dest, struct nuvec_s* v, s32 angle)
 {
-	f32 s = ANG_SIN(angle);
-	f32 c = ANG_COS(angle);
-	dest->x = v->x * c + v->z * s;
-	dest->y = v->y;
-	dest->z = v->z * c - v->x * s;
+  float new_var;
+  f32 c = NuTrigTable[(u16) (angle + 0x4000)];
+  f32 s = NuTrigTable[(u16) angle];
+  new_var = v->x * s;
+  dest->x = (v->x * c) + (v->z * s);
+  dest->y = v->y;
+  dest->z = (v->z * c) - new_var;
 }
 
 void NuVecRotateZ(struct nuvec_s* dest, struct nuvec_s* v, s32 angle)
 {
-	f32 s = ANG_SIN(angle);
-	f32 c = ANG_COS(angle);
-	dest->x = v->x * c - v->y * s;
-	dest->y = v->x * s + v->y * c;
-	dest->z = v->z;
+  f32 c = NuTrigTable[(u16) (angle + 0x4000)];
+  f32 new_var;
+  f32 s = NuTrigTable[(u16) angle];
+  new_var = v->x;
+  dest->x = (new_var * c) - (v->y * s);
+  dest->y = (new_var * s) + (v->y * c);
+  dest->z = v->z;
 }
 
 void NuVecAdd(struct nuvec_s* dest, struct nuvec_s* a, struct nuvec_s* b)

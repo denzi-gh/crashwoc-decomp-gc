@@ -52,28 +52,37 @@ s16 GetVolumeI(float vol) {
 }
 
 void MyGameSfx(s32 Id, struct nuvec_s *Pos, s32 Vol) {
-    if (Level == 0x15 && Pos != NULL) {
-        Vol = Vol * 4 + Vol;
-    }
-    gamesfx_effect_volume = Vol;
-    GameSfx(Id, Pos);
+  s32 *new_var;
+  if ((Level == 0x15) && (Pos != ((void *) 0)))
+  {
+    new_var = &Vol;
+    Vol = ((*new_var) * 4) + Vol;
+  }
+  gamesfx_effect_volume = Vol;
+  GameSfx(Id, Pos);
 }
 
 void MyGameSfxLoop(s32 Id, struct nuvec_s *Pos, s32 Vol) {
-    if (Level == 0x15 && Pos != NULL) {
-        Vol = Vol * 4 + Vol;
-    }
-    gamesfx_effect_volume = Vol;
-    GameSfxLoop(Id, Pos);
+  s32 *new_var;
+  if ((Level == 0x15) && (Pos != ((void *) 0)))
+  {
+    new_var = &Vol;
+    Vol = ((*new_var) * 4) + (*new_var);
+  }
+  gamesfx_effect_volume = Vol;
+  GameSfxLoop(Id, Pos);
 }
 
 void MyGameSfxLoopVolPitch(s32 Id, struct nuvec_s *Pos, s32 Vol, s32 Pitch) {
-    if (Level == 0x15 && Pos != NULL) {
-        Vol = Vol * 4 + Vol;
-    }
-    gamesfx_effect_volume = Vol;
-    gamesfx_pitch = Pitch;
-    GameSfxLoop(Id, Pos);
+  s32 *new_var;
+  new_var = &Vol;
+  if ((Level == 0x15) && (Pos != ((void *) 0)))
+  {
+    Vol = ((*new_var) * 4) + Vol;
+  }
+  gamesfx_effect_volume = Vol;
+  gamesfx_pitch = Pitch;
+  GameSfxLoop(Id, Pos);
 }
 
 struct nuvec_s SetNuVec(f32 x, f32 y, f32 z) {
@@ -240,46 +249,47 @@ void SeekAngHalfLife360f(float *dest, float target, float halflife, float dt) {
 }
 
 void SeekAngLimHalfLife360f(float *dest, float target, float max_speed, float halflife, float dt) {
-    float rate;
-    float change;
-    float lim;
-
-    lim = max_speed * dt;
-
-    if (halflife == 0.0f) {
-        rate = 1.0f;
-    } else {
-        rate = 1.0f - 1.0f / (float)pow(2.0, dt / halflife);
-    }
-
-    change = rate * Rationalise360f(target - *dest);
-
-    if (change > lim) {
-        change = lim;
-    }
-    if (change < -lim) {
-        change = -lim;
-    }
-
-    *dest += change;
+  float rate;
+  float lim;
+  lim = max_speed * dt;
+  if (halflife == 0.0f)
+  {
+    rate = 1.0f;
+  }
+  else
+  {
+    rate = 1.0f - (1.0f / ((float) pow(2.0, dt / halflife)));
+  }
+  rate = rate * Rationalise360f(target - (*dest));
+  if (rate > lim)
+  {
+    rate = lim;
+  }
+  if (rate < (-lim))
+  {
+    rate = -lim;
+  }
+  *dest += rate;
 }
 
 void SeekAngHalfLife(u16 *dest, u16 target, float halflife, float dt) {
-    float rate;
-    float diff;
-    float cur;
-    float result;
-
-    if (halflife == 0.0f) {
-        rate = 1.0f;
-    } else {
-        rate = 1.0f - 1.0f / (float)pow(2.0, dt / halflife);
-    }
-
-    diff = (float)(s16)(target - *dest);
-    cur = (float)(s16)*dest;
-    result = rate * diff + cur;
-    *dest = (u16)(s32)result;
+  float rate;
+  float diff;
+  float cur;
+  float result;
+  if (halflife == 0.0f)
+  {
+    rate = 1.0f;
+  }
+  else
+  {
+    rate = 1.0f - (1.0f / ((float) pow(2.0, dt / halflife)));
+  }
+  diff = (float) ((s16) (target - (*dest)));
+  cur = (float) ((s16) (*dest));
+  result = (rate * diff) + cur;
+  rate = result;
+  *dest = (u16) ((s32) rate);
 }
 
 float frand(void) {
@@ -352,18 +362,22 @@ s32 ProcessTimer(float *Timer) {
 s32 MyInitModelNew(struct MYDRAW *Draw, s32 Character, s32 Action,
                    s32 NumJoints, struct NUJOINTANIM_s *JointList,
                    struct nuvec_s *Position) {
-    if ((s8)CRemap[Character] == -1) {
-        return 0;
-    }
-
-    Draw->Character = Character;
-    Draw->NumJoints = NumJoints;
-    Draw->JointList = JointList;
-    Draw->Position = Position;
-    Draw->Model = &CModel[(s8)CRemap[Character]];
-    ResetAnimPacket(&Draw->Anim, Action);
-    ResetLights(&Draw->Nearest_Light);
-    return 1;
+  signed char new_var2;
+  struct MYDRAW *new_var;
+  if ((-1) == ((s8) CRemap[Character]))
+  {
+    return 0;
+  }
+  new_var2 = CRemap[Character];
+  Draw->Character = Character;
+  Draw->NumJoints = NumJoints;
+  Draw->JointList = JointList;
+  new_var = Draw;
+  Draw->Position = Position;
+  Draw->Model = &CModel[(s8) new_var2];
+  ResetAnimPacket(&Draw->Anim, Action);
+  ResetLights(&new_var->Nearest_Light);
+  return 1;
 }
 
 s32 MyDrawModelNew(struct MYDRAW *Draw, struct numtx_s *Mat, struct numtx_s *Locators) {
@@ -394,9 +408,9 @@ void MyResetAnimPacket(struct MYDRAW *Draw, s32 Action) {
 }
 
 void MyChangeAnim(struct MYDRAW *Draw, s32 Action) {
-    Draw->Anim.flags = 0;
-    Draw->Anim.oldaction = Draw->Anim.action;
-    Draw->Anim.newaction = (s16)Action;
+  Draw->Anim.flags = 0;
+  Draw->Anim.newaction = (s16) Action;
+  Draw->Anim.oldaction = Draw->Anim.action;
 }
 
 float ControlledDist(struct nuvec_s *A, struct nuvec_s *B, s32 control) {

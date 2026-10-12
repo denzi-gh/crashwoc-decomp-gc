@@ -7076,18 +7076,18 @@ s32 GetCurrentWeatherResearchObjectives(void) {
 
 // NGC MATCH
 void SpaceArenaReset(s32 PlayerDead) {
-  Level_DeadTime = 8.0f;
+  Level_GliderSpeed = 8.0f;
   Level_GliderFloor = -30.0f;
+  Level_GliderCeiling = 35.0f;
   Level_GliderCurrentCeiling = 35.0f;
   Level_GliderRadius = 180.0f;
+  Level_DeadTime = 8.0f;
   Level_GliderCentreX = 0.0f;
   Level_GliderCentreZ = 0.0f;
-  FireFlyIntroOn = 0;
   LevelResetTimer = 0;
   FireFlyIntroAction = 0;
   FireFlyIntroOldAction = -1;
-  Level_GliderSpeed = 8.0f;
-  Level_GliderCeiling = 35.0f;
+  FireFlyIntroOn = 0;
   InitGlider(&PlayerGlider, &CrashteroidsStart, CrashteroidsStartAngle);
   GameCam[0].m._30 = CrashteroidsStart.x + 0.0f;
   GameCam[0].m._31 = CrashteroidsStart.y + 2.0f;

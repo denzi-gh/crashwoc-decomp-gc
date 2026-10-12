@@ -247,14 +247,17 @@ void instNuGCutSceneDestroy(struct instNUGCUTSCENE_s *icutscene)
   {
     instNuGCutSceneEnd(icutscene);
   }
-  if (icutscene->next != NULL) {
+  if (icutscene->next != ((void *) 0))
+  {
     icutscene->next->prev = icutscene->prev;
   }
-  if (icutscene->prev == NULL) {
-    active_cutscene_instances = icutscene->next;
-  }
-  else {
+  if (!(icutscene->prev == ((void *) 0)))
+  {
     icutscene->prev->next = icutscene->next;
+  }
+  else
+  {
+    active_cutscene_instances = icutscene->next;
   }
   return;
 }
@@ -700,16 +703,16 @@ void instNuGCutCamSysStart(struct instNUGCUTCAMSYS_s *icamsys,struct NUGCUTCAMSY
 {
   struct instNUGCUTCAM_s *icutcam;
   u32 i;
-  
   icamsys->next_switch = '\0';
   icamsys->current_camera = camsys->initial_camid;
   icamsys->next_tgt_ix = '\0';
-    for (i = 0; camsys->ncutcams > i; i++)
-    {
-      icutcam = &icamsys->icutcams[i];
-      icutcam->flags = icutcam->flags & 0xfd;
-      icutcam->tgt_ix = '\0';
-    }
+  for (i = 0; i < camsys->ncutcams; i++)
+  {
+    icutcam = &icamsys->icutcams[i];
+    icutcam->flags = icutcam->flags & 0xfd;
+    icutcam->tgt_ix = '\0';
+  }
+
   return;
 }
 
@@ -904,12 +907,12 @@ void instNuGCutLocatorSysStart(struct instNUGCUTLOCATORSYS_s *ilocatorsys,struct
 {
   struct instNUGCUTLOCATOR_s *ilocator;
   u32 i;
+  for (i = 0; i < ((u32) locatorsys->nlocators); i++)
+  {
+    ilocator = &ilocatorsys->ilocators[i];
+    ilocator->timer = 0.0f;
+  }
 
-    for(i = 0; (u32)locatorsys->nlocators > i; i++)
-    {
-      ilocator = &ilocatorsys->ilocators[i];
-      ilocator->timer = 0.0f;
-    }
   return;
 }
 

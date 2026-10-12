@@ -1303,58 +1303,70 @@ void NuRndrAddShadow(struct nuvec_s* v, f32 scale, s16 shade, s16 xrot,  s16 yro
 //DONE 93% (regswap)
 int NuHGobjRndr(struct NUHGOBJ_s *hgobj,struct numtx_s *wm,int nlayers,short *layers)
 {
-    struct numtx_s *T;
-    int layer;
-    int i;
-    int flags = 0;
-    struct numtx_s *parent_T;
-    struct numtx_s* WT;
-    char pad[73];
+  struct numtx_s *T;
+  int layer;
+  int i;
+  int flags = 0;
+  struct numtx_s *parent_T;
+  struct numtx_s *WT;
+  char pad[73];
+  struct NUHGOBJ_s *new_var;
+  layer = nlayers + (-1);
+  if (layer >= hgobj->num_layers)
+  {
+    NuErrorProlog("C:/source/crashwoc/code/nu3dx/nurndr.c", 0x8a8)("assert");
+  }
+  for (i = 0; i < hgobj->num_joints; i++)
+  {
+    T = &hgobj->T[i];
+    WT = &mtx_arrayHGobj[i];
+    if (hgobj->joints[i].parent_ix == (-1))
+    {
+      NuMtxMul(WT, T, wm);
+    }
+    else
+    {
+      NuMtxMul(WT, T, &mtx_arrayHGobj[hgobj->joints[i].parent_ix]);
+    }
+  }
 
-    layer = nlayers + -1;
-    if (layer >= hgobj->num_layers) {
-        NuErrorProlog("C:/source/crashwoc/code/nu3dx/nurndr.c",0x8a8)("assert");
+  if ((hgobj->layers[layer].gobjs != ((void *) 0)) && (!(flags & 2)))
+  {
+    for (i = 0; i < hgobj->num_joints; i++)
+    {
+      if (hgobj->layers[layer].gobjs[i] != ((void *) 0))
+      {
+        NuRndrGobj(hgobj->layers[layer].gobjs[i], &mtx_arrayHGobj[i], (void *) 0);
+      }
     }
 
-    for (i = 0; i < hgobj->num_joints; i++) {
-        T = &hgobj->T[i];
-        WT = &mtx_arrayHGobj[i];
-        if (hgobj->joints[i].parent_ix == -1) {
-            NuMtxMul(WT,T,wm);
-        }
-        else {
-            NuMtxMul(WT,T,&mtx_arrayHGobj[hgobj->joints[i].parent_ix]);
-        }
+  }
+  if ((hgobj->layers[layer].blend_gobjs != ((void *) 0)) && (!(flags & 2)))
+  {
+    for (i = 0; i < hgobj->num_joints; i++)
+    {
+      if (hgobj->layers[layer].blend_gobjs[i] != ((void *) 0))
+      {
+        NuRndrGobj(hgobj->layers[layer].blend_gobjs[i], &mtx_arrayHGobj[i], (void *) 0);
+      }
     }
 
-    if (hgobj->layers[layer].gobjs != NULL && !(flags & 2)) {
-        for (i = 0; i < hgobj->num_joints; i++) {
-            if (hgobj->layers[layer].gobjs[i] != NULL) {
-                NuRndrGobj(hgobj->layers[layer].gobjs[i],&mtx_arrayHGobj[i],NULL);
-            }
-        }
-    }
+  }
+  new_var = hgobj;
+  for (i = 0; i < new_var->num_joints; i++)
+  {
+    NuMtxMul(&mtx_array2HGobj[i], &new_var->INV_WT[i], &mtx_arrayHGobj[i]);
+  }
 
-    if (hgobj->layers[layer].blend_gobjs != NULL && !(flags & 2))  {
-        for (i = 0; i < hgobj->num_joints; i++) {
-            if (hgobj->layers[layer].blend_gobjs[i] != NULL) {
-                NuRndrGobj(hgobj->layers[layer].blend_gobjs[i],&mtx_arrayHGobj[i],NULL);
-            }
-        }
-    }
-
-    for (i = 0; i < hgobj->num_joints; i++) {
-        NuMtxMul(&mtx_array2HGobj[i],&hgobj->INV_WT[i],&mtx_arrayHGobj[i]);
-    }
-
-    if (hgobj->layers[layer].skin_gobj != NULL && !(flags & 1)) {
-        NuRndrGobjSkin2(hgobj->layers[layer].skin_gobj,hgobj->num_joints,mtx_array2HGobj,NULL);
-    }
-
-    if (hgobj->layers[layer].blend_skin_gobj != NULL && !(flags & 1)) {
-        NuRndrGobjSkin2(hgobj->layers[layer].blend_skin_gobj,hgobj->num_joints,mtx_array2HGobj,NULL);
-    }
-    return 1;
+  if ((new_var->layers[layer].skin_gobj != ((void *) 0)) && (!(flags & 1)))
+  {
+    NuRndrGobjSkin2(new_var->layers[layer].skin_gobj, new_var->num_joints, mtx_array2HGobj, (void *) 0);
+  }
+  if ((new_var->layers[layer].blend_skin_gobj != ((void *) 0)) && (!(flags & 1)))
+  {
+    NuRndrGobjSkin2(new_var->layers[layer].blend_skin_gobj, new_var->num_joints, mtx_array2HGobj, (void *) 0);
+  }
+  return 1;
 }
 
 

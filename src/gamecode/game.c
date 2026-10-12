@@ -3229,9 +3229,9 @@ if ((cp_iRAIL == -1) || (cp_iALONG == -1))
 //NGC MATCH
 void ResetLoadSaveCharacter(void) {
   Hub = -1;
-  tumble_action = -1;
   tumble_duration = 0.0f;
   tumble_time = 0.0f;
+  tumble_action = -1;
   last_level = -1;
   last_hub = -1;
   player->obj.hdg = 0x8000;

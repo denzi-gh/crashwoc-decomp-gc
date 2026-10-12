@@ -508,9 +508,9 @@ static void SetBreakAlarm(OSTime timeout)
 
 BOOL DVDLowBreak()
 {
-	StopAtNextInt = TRUE;
-	Breaking      = TRUE;
-	return TRUE;
+  int new_var;
+  new_var = 1;
+ do { Breaking = new_var; StopAtNextInt = new_var; return new_var; } while (0);
 }
 
 DVDLowCallback DVDLowClearCallback()

@@ -165,34 +165,40 @@ void NuTexAnimProgAssembleEnd(struct nutexanimprog_s *p) {
 }
 
 struct nutexanimenv_s *NuTexAnimEnvCreate(union variptr_u *buff, struct numtl_s *mtl, s16 *tids, struct nutexanimprog_s *p) {
-    struct nutexanimenv_s *env;
-
-    if (buff != NULL) {
-        env = (struct nutexanimenv_s *)((buff->intaddr + 3) & ~3);
-        buff->intaddr = (unsigned int)env + 0xEC;
-    } else {
-        env = (struct nutexanimenv_s *)NuMemAlloc(0xEC);
+  struct nutexanimenv_s *env;
+  unsigned int new_var;
+  if (buff != ((void *) 0))
+  {
+    env = (struct nutexanimenv_s *) ((buff->intaddr + 3) & (~3));
+    new_var = (unsigned int) env;
+    buff->intaddr = new_var + 0xEC;
+  }
+  else
+  {
+    env = (struct nutexanimenv_s *) NuMemAlloc(0xEC);
+  }
+  if (env != ((void *) 0))
+  {
+    env->prog = p;
+    env->mtl = mtl;
+    env->tids = tids;
+    env->pc = 0;
+    env->rep_ix = 0;
+    env->ra_ix = 0;
+    env->pause = 0;
+    env->pause_r = 0;
+    env->pause_cnt = 0;
+    env->tex_ix = 0;
+    if (buff != ((void *) 0))
+    {
+      env->dynalloc = 0;
     }
-
-    if (env != NULL) {
-        env->prog = p;
-        env->mtl = mtl;
-        env->tids = tids;
-        env->tex_ix = 0;
-        env->pc = 0;
-        env->rep_ix = 0;
-        env->ra_ix = 0;
-        env->pause = 0;
-        env->pause_r = 0;
-        env->pause_cnt = 0;
-        if (buff != NULL) {
-            env->dynalloc = 0;
-        } else {
-            env->dynalloc = 1;
-        }
+    else
+    {
+      env->dynalloc = 1;
     }
-
-    return env;
+  }
+  return env;
 }
 
 static int EvalVars(int cc, int a, int b) {
@@ -379,15 +385,16 @@ static void pftaLabel(struct nufpar_s *fp) {
 }
 
 static void pftaXDef(struct nufpar_s *fp) {
-    int idx;
-    int cnt;
-
-    NuFParGetWord(fp);
-    idx = XDefLabTabFind((char *)fp + 0x1105);
-    cnt = parprog->xdef_cnt;
-    parprog->xdef_ids[cnt] = idx;
-    parprog->xdef_addrs[cnt] = parprog->eop;
-    parprog->xdef_cnt++;
+  int idx;
+  int cnt;
+  int new_var;
+  NuFParGetWord(fp);
+  new_var = 0x1105;
+  idx = XDefLabTabFind(((char *) fp) + new_var);
+  ;
+  parprog->xdef_ids[parprog->xdef_cnt] = idx;
+  parprog->xdef_addrs[parprog->xdef_cnt] = parprog->eop;
+  parprog->xdef_cnt++;
 }
 
 static void pftaGoto(struct nufpar_s *fp) {
@@ -749,14 +756,14 @@ void NuTexAnimEnvProc(struct nutexanimenv_s *env) {
 }
 
 void NuTexAnimSetSignals(u32 sig) {
-    u32 old;
-    u32 diff;
-
-    old = nta_sig_old;
-    nta_sig_old = sig;
-    diff = sig ^ old;
-    nta_sig_off = diff & ~sig;
-    nta_sig_on = diff & sig;
+  u32 old;
+  u32 diff;
+  old = nta_sig_old;
+  nta_sig_old = sig;
+  diff = sig ^ old;
+  nta_sig_off = diff & (~sig);
+  diff = diff & sig;
+  nta_sig_on = diff;
 }
 
 void NuTexAnimProcessList(struct nutexanim_s *nta) {
@@ -785,35 +792,41 @@ void NuTexAnimAddList(struct nutexanim_s *nta) {
 }
 
 void NuTexAnimRemoveList(struct nutexanim_s *nta) {
-    struct nutexanimlist_s *cur;
-    struct nutexanimlist_s *head;
-    struct nutexanimlist_s *free_list;
-
-    cur = ntal_first;
-    if (cur == NULL) return;
-
-    free_list = ntal_free;
-    head = cur;
-
-    while (cur != NULL) {
-        if (cur->nta == nta) {
-            if (cur->succ != NULL) {
-                cur->succ->prev = cur->prev;
-            }
-            if (cur->prev != NULL) {
-                cur->prev->succ = cur->succ;
-            } else {
-                head = cur->succ;
-            }
-            cur->succ = free_list;
-            free_list = cur;
-            break;
-        }
-        cur = cur->succ;
+  struct nutexanimlist_s *cur;
+  struct nutexanimlist_s *head;
+  struct nutexanimlist_s *free_list;
+  cur = ntal_first;
+  if (cur == ((void *) 0))
+  {
+    return;
+  }
+  free_list = ntal_free;
+  head = cur;
+  while (cur != ((void *) 0))
+  {
+    if (cur->nta == nta)
+    {
+      if (cur->succ != ((void *) 0))
+      {
+        cur->succ->prev = cur->prev;
+      }
+      if (cur->prev != ((void *) 0))
+      {
+        cur->prev->succ = cur->succ;
+      }
+      else
+      {
+ do { head = cur->succ; } while (0);
+      }
+      cur->succ = free_list;
+      free_list = cur;
+      break;
     }
+    cur = cur->succ;
+  }
 
-    ntal_free = free_list;
-    ntal_first = head;
+  ntal_free = free_list;
+  ntal_first = head;
 }
 
 void NuTexAnimProcess(void) {
