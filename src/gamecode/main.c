@@ -91,10 +91,11 @@ s32 i_cratetypedata;
 struct numtl_s* CrateMat;
 struct numtl_s* CrateMat2;
 extern struct ldata_s LData[];
-extern char SfxTabGLOBAL[];
+extern struct pSFX SfxTabGLOBAL[177];
 extern s32 SFXCOUNT_ALL;
 extern struct numtl_s* DebMat[8];
 extern volatile s32 crash_loaded;
+void ResetCheckpoint(s32 iRAIL, s32 iALONG, float fALONG, struct nuvec_s *pos);
 
 
 //NGC MATCH
@@ -336,12 +337,11 @@ void InitParticleSystem(void) {
   return;
 }
 
-//95% NGC
+//97.61% NGC (condition-register save/scheduling)
 void InitWorld(void) {
     void NuGScnUpdate(struct nugscn_s *scn, float dt);
     void edobjUpdateObjects(float frametime);
     void edanimUpdateObjects(float dt);
-    void ResetCheckpoint(s32 iRAIL, s32 iALONG, float fALONG, struct nuvec_s *pos);
     void TerrainSetCur(void *curterr);
     short *terraininit(int LevelNum, short **store, short *endstore, int opt, char *name, struct nugscn_s *gscene, int gsid);
     void noterraininit(void);
@@ -423,7 +423,7 @@ void InitWorld(void) {
     edbitsRegisterBaseScene(world_scene[0]);
     NuBridgeRegisterBaseScene(world_scene[0]);
     edanimRegisterBaseScene(world_scene[0]);
-    edbitsRegisterSfx((struct pSFX *)SfxTabGLOBAL, LDATA->pSFX, 0xb1, SFXCOUNT_ALL);
+    edbitsRegisterSfx(SfxTabGLOBAL, LDATA->pSFX, 0xb1, SFXCOUNT_ALL);
     NuBridgeInit();
     NuWindInit();
     noterraininit();
@@ -605,7 +605,7 @@ void LoadLevel(void) {
     InitCreatures();
     ParticleReset();
     InitParticleSystem();
-    NuStopLoadScreen();
+    NuStopLoadScreen(0);
     if (Level == 7) {
         YTOL = 0.01166667f;
     } else {
