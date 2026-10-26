@@ -57,13 +57,13 @@ struct animlist {
     unsigned long long levbits;
 };
 
-    struct animlist *CrashAnim_CREDITS[2];
-    struct animlist *CrashAnim_MINETUB[5];
-    struct animlist *CrashAnim_ATLASPHERE[11];
-    struct animlist *CrashAnim_MOSQUITO[3];
-    struct animlist *CrashAnim_GLIDER[5];
-    struct animlist *CocoAnim_DROPSHIP[3];
-    struct animlist *CrashAnim_GYRO[7];
+extern struct animlist CrashAnim_CREDITS[2];
+extern struct animlist CrashAnim_MINETUB[5];
+extern struct animlist CrashAnim_ATLASPHERE[11];
+extern struct animlist CrashAnim_MOSQUITO[3];
+extern struct animlist CrashAnim_GLIDER[5];
+extern struct animlist CocoAnim_DROPSHIP[3];
+extern struct animlist CrashAnim_GYRO[7];
 
 struct space_s{
     s32 character;

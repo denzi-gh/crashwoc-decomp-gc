@@ -45,8 +45,8 @@ s32 PadDemoEnd;
 f32 gravdiv = 1.0f;
 
 void *renderpsdma(s32 count, struct rdata_s *rdata, struct PartHeader_testretail *setup, struct numtl_s *mtl, float time, struct numtx_s *wm);
-void reverseendian32(char *value);
-void reverseendian16(short *value);
+static void reverseendian32(char *value);
+static void reverseendian16(short *value);
 
 int maxblend_cntcnt;
 int maxblend_cnt;
@@ -848,7 +848,27 @@ s32 NuPs2ReadPad(struct nupad_s *pad) {
 }
 */
 
-//reverseendian32, reverseendian16 TODO //97% NGC
+//NGC MATCH
+static void reverseendian32(char *value) {
+    char tmp[4];
+
+    tmp[0] = value[3];
+    tmp[1] = value[2];
+    tmp[2] = value[1];
+    tmp[3] = value[0];
+    *(s32 *)value = *(s32 *)tmp;
+}
+
+//NGC MATCH
+static void reverseendian16(short *value) {
+    short tmp;
+
+    ((char *)&tmp)[0] = ((char *)value)[1];
+    ((char *)&tmp)[1] = ((char *)value)[0];
+    *value = tmp;
+}
+
+//97% NGC
 void InitPadPlayRecord(char *name,s32 mode,s32 size,void *buff) {
   s32 i;
   struct padrecinfo_s *recinfo;
@@ -1155,8 +1175,12 @@ void DebMtxTransform(struct nuvec_s *v,struct nuvec_s *v0) {
     return;
 }
 
+void GS_DrawQuadListSetVert(struct _GS_VECTOR3 *pos, float u, float v);
+
 //NGC MATCH
 void* renderpsdma(s32 count, struct rdata_s* rdata, struct PartHeader_testretail* setup, struct numtl_s* mtl, float time, struct numtx_s* wm) {
+    void NuMtlSetRenderStates();
+
     s32 index;
     s32 i;
     struct nuvec_s* pdatpt;
@@ -1173,7 +1197,8 @@ void* renderpsdma(s32 count, struct rdata_s* rdata, struct PartHeader_testretail
 
 
     grav /= gravdiv;
-    rdeb = &rdata->debris[0];
+    // GC chunks have no unpackdata header: debris starts right after dmadata
+    rdeb = (struct uv1deb*)rdata->unpackdata;
     ResetShaders();
     GS_SetAlphaCompare(4, 0);
     NuTexSetTexture(0, mtl->tid);
@@ -1243,7 +1268,7 @@ void* renderpsdma(s32 count, struct rdata_s* rdata, struct PartHeader_testretail
     return rdeb;
 }
 
-//89.61% NGC
+//MATCH NGC
 void GenericDebinfoDmaTypeUpdate(struct debinftype* debinfo) {
     struct PartList_s* PartData;
     s32 i;
@@ -1278,46 +1303,39 @@ void GenericDebinfoDmaTypeUpdate(struct debinftype* debinfo) {
     debinfo->DmaDebTypePointer->v1 = ((u32)debinfo->v2 & 511) / 256.0f;
 
     for (i = 0; i < 64; i++) {
-        time = i / 64.0f;
+        time = i * 0.015625f;
 
-        // Width slot interpolation
         for (j = 0; j < 7; j++) {
             if ((debinfo->wslot[j].t <= time) && (debinfo->wslot[j + 1].t >= time)) {
                 break;
             }
         }
-
         dt = time - debinfo->wslot[j].t;
-        if (debinfo->wslot[j + 1].t - debinfo->wslot[j].t == 0.0f) {
+        tt = debinfo->wslot[j + 1].t - debinfo->wslot[j].t;
+        if (tt == 0.0f) {
             vw = debinfo->wslot[j].w;
         } else {
-            tt = debinfo->wslot[j + 1].t - debinfo->wslot[j].t;
             vw = debinfo->wslot[j].w + (dt / tt) * (debinfo->wslot[j + 1].w - debinfo->wslot[j].w);
         }
 
-        // Height slot interpolation
         for (j = 0; j < 7; j++) {
             if ((debinfo->hslot[j].t <= time) && (debinfo->hslot[j + 1].t >= time)) {
                 break;
             }
         }
-
-
         dt = time - debinfo->hslot[j].t;
-        if (debinfo->hslot[j + 1].t - debinfo->hslot[j].t == 0.0f) {
+        tt = debinfo->hslot[j + 1].t - debinfo->hslot[j].t;
+        if (tt == 0.0f) {
             vh = debinfo->hslot[j].h;
         } else {
-            tt = debinfo->hslot[j + 1].t - debinfo->hslot[j].t;
-            vh = debinfo->hslot[j].h + (dt / (tt)) * (debinfo->hslot[j + 1].h - debinfo->hslot[j].h);
+            vh = debinfo->hslot[j].h + (dt / tt) * (debinfo->hslot[j + 1].h - debinfo->hslot[j].h);
         }
 
-        // Rotation slot interpolation
         for (j = 0; j < 7; j++) {
             if ((debinfo->rotslot[j].t <= time) && (debinfo->rotslot[j + 1].t >= time)) {
                 break;
             }
         }
-
         dt = time - debinfo->rotslot[j].t;
         tt = debinfo->rotslot[j + 1].t - debinfo->rotslot[j].t;
         if (tt == 0.0f) {
@@ -1326,55 +1344,42 @@ void GenericDebinfoDmaTypeUpdate(struct debinftype* debinfo) {
             vrot = debinfo->rotslot[j].r + (dt / tt) * (debinfo->rotslot[j + 1].r - debinfo->rotslot[j].r);
         }
 
-        // Calculate vertex positions
-        vh *= 0.25f;
-        vb *= 0.25f;
-
-        vjx = debinfo->jibxamp * NuTrigTable[(s32)((debinfo->jibxfreq * time) * 65536.0f) & 0xffff];
-        vjy = debinfo->jibyamp * NuTrigTable[(s32)((debinfo->jibyfreq * time) * 65536.0f) & 0xffff];
-
+        vjx = debinfo->jibxamp * NuTrigTable[(s32)(debinfo->jibxfreq * time * 65536.0f) & 0xffff];
+        vjy = debinfo->jibyamp * NuTrigTable[(s32)(debinfo->jibyfreq * time * 65536.0f) & 0xffff];
         x0 = NuTrigTable[(s32)(vrot + 16384.0f) & 0xffff];
         y0 = NuTrigTable[(s32)vrot & 0xffff];
-        
-        x1 = vh * x0;
-        y1 = vh * y0;
-
-        dx = -vw * x0 - x1 + vjx;
-        dy = vw * y0 - y1 + vjy;
+        x1 = vw * 0.25f;
+        y1 = vh * 0.25f;
 
         PartData = &debinfo->DmaDebTypePointer->Data[i];
-        
-        PartData->vt[0].x = dx / 2048.0f;
-        PartData->vt[0].y = dy / 2048.0f;
+        PartData->vt[0].x = (-x1 * x0 - y1 * y0 + vjx) / 2048.0f;
+        PartData->vt[0].y = (x1 * y0 - y1 * x0 + vjy) / 2048.0f;
         PartData->vt[0].z = 0.0f;
-        
-        PartData->vt[1].x = (-vw * y0 - x1 + vjx) / 2048.0f;
-        PartData->vt[1].y = (-vw * x0 + y1 + vjy) / 2048.0f;
+        dy = -x1 * y0 - y1 * x0 + vjy;
+        dx = x1 * x0 - y1 * y0 + vjx;
+        PartData->vt[1].x = dx / 2048.0f;
+        PartData->vt[1].y = dy / 2048.0f;
         PartData->vt[1].z = 0.0f;
-        
         PartData->vt[2].x = (vh * 0.5f * y0 + dx) / 2048.0f;
         PartData->vt[2].y = (vh * 0.5f * x0 + dy) / 2048.0f;
         PartData->vt[2].z = 0.0f;
 
-        // Color slot interpolation
         for (j = 0; j < 7; j++) {
             if ((debinfo->colslot[j].t <= time) && (debinfo->colslot[j + 1].t >= time)) {
                 break;
             }
         }
-
-        
         dt = time - debinfo->colslot[j].t;
-        if (debinfo->colslot[j + 1].t - debinfo->colslot[j].t == 0.0f) {
-            if (time - debinfo->colslot[j].t >= 0.0f) {
-                vr = vg = vb = 255.0f;
+        tt = debinfo->colslot[j + 1].t - debinfo->colslot[j].t;
+        if (tt == 0.0f) {
+            if (dt >= 0.0f) {
+                vb = vr = vg = 255.0f;
             } else {
                 vr = 0.0f;
                 vg = 0.0f;
-                // vb = 0.0f;
+                vb = 0.0f;
             }
         } else {
-            tt = debinfo->colslot[j + 1].t - debinfo->colslot[j].t;
             vr = debinfo->colslot[j].r + (dt / tt) * (debinfo->colslot[j + 1].r - debinfo->colslot[j].r);
             vg = debinfo->colslot[j].g + (dt / tt) * (debinfo->colslot[j + 1].g - debinfo->colslot[j].g);
             vb = debinfo->colslot[j].b + (dt / tt) * (debinfo->colslot[j + 1].b - debinfo->colslot[j].b);
@@ -1384,31 +1389,26 @@ void GenericDebinfoDmaTypeUpdate(struct debinftype* debinfo) {
         if (vr > 255.0) {
             vr = 255.0f;
         }
-
         vg *= 2.0f;
         if (vg > 255.0) {
             vg = 255.0f;
         }
-
         vb *= 2.0f;
         if (vb > 255.0) {
             vb = 255.0f;
         }
 
-        // Alpha slot interpolation
         for (j = 0; j < 7; j++) {
             if ((debinfo->alpslot[j].t <= time) && (debinfo->alpslot[j + 1].t >= time)) {
                 break;
             }
         }
-
-        time -= debinfo->alpslot[j].t;
+        dt = time - debinfo->alpslot[j].t;
         tt = debinfo->alpslot[j + 1].t - debinfo->alpslot[j].t;
-
         if (tt == 0.0f) {
-            va = (time >= 0.0f) ? 255.0f : 0.0f;
+            va = (dt >= 0.0f) ? 255.0f : 0.0f;
         } else {
-            va =  debinfo->alpslot[j].a + (time / tt) * (debinfo->alpslot[j + 1].a - debinfo->alpslot[j].a);
+            va = debinfo->alpslot[j].a + (dt / tt) * (debinfo->alpslot[j + 1].a - debinfo->alpslot[j].a);
         }
 
         va *= 2.0f;
@@ -1416,7 +1416,7 @@ void GenericDebinfoDmaTypeUpdate(struct debinftype* debinfo) {
             va = 255.0f;
         }
 
-        PartData->colour = (s32)vb << 0x10 | ((s32)vr << 8) | ((u32)vg) | ((u32)va << 0x18);
+        PartData->colour = ((s32)vr << 16) | ((s32)vg << 8) | (u32)vb | ((u32)va << 24);
     }
 }
 

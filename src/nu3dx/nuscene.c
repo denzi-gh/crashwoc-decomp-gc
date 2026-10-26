@@ -422,7 +422,7 @@ static void ReadNuIFFGeomSkin(s32 handle,struct nugeom_s *geom) {
   return;
 }
 
-static void ReadNuIFFBlendShape(s32 fh,struct nugeom_s *geom) {
+static void ReadNuIFFBlendShape(s32 fh, struct nugeom_s *geom) {
     s32 numblends;
     s32 nblends;
     s32 i;
@@ -432,58 +432,53 @@ static void ReadNuIFFBlendShape(s32 fh,struct nugeom_s *geom) {
     struct NUBLENDGEOM_s *bg;
 
     nblends = NuFileReadInt(fh);
-    if (nblends == 0) {
-        return;
-    }
-
-    nbytes = nblends * sizeof(struct nuvec_s*);
-
-    geom->blendgeom = (struct NUBLENDGEOM_s *)NuMemAlloc(sizeof(struct NUBLENDGEOM_s));
-    memset(geom->blendgeom, 0, sizeof(struct NUBLENDGEOM_s));
-
-    geom->blendgeom->nblends = nblends;
-
-    geom->blendgeom->blend_offsets = (struct nuvec_s **)NuMemAlloc(nbytes);
-    memset(geom->blendgeom->blend_offsets, 0, nbytes);
-
-    geom->blendgeom->ix = (s32 *)NuMemAlloc(nbytes);
-    NuFileRead(fh, geom->blendgeom->ix, nbytes);
-
-    numblends = NuFileReadInt(fh);
-    geom->blendgeom->offsets = (struct nuvec_s *)NuMemAlloc(numblends);
-    NuFileRead(fh, geom->blendgeom->offsets, numblends);
-
-    next_ix = 0;
-    for (i = 0; i < nblends; i++) {
-        if (NuFileReadChar(fh) != '\0') {
-            geom->blendgeom->blend_offsets[i] = &geom->blendgeom->offsets[next_ix];
-            next_ix += geom->vtxcnt;
-        }
-    }
-
-    if (numblends == 0) {
-        geom->blendgeom = NULL;
-    }
-
-    bg = geom->blendgeom;
-    if (bg != NULL) {
-        for (i = 0; i < geom->vtxcnt; i++) {
-            for (j = 0; j < nblends; j++) {
-                if (bg->blend_offsets[j] != NULL) {
-                    if (NuFabs(bg->blend_offsets[j][i].x) < 0.00001f) {
-                        geom->blendgeom->blend_offsets[j][i].x = 0.0f;
-                    }
-                    if (NuFabs(geom->blendgeom->blend_offsets[j][i].y) < 0.00001f) {
-                        geom->blendgeom->blend_offsets[j][i].y = 0.0f;
-                    }
-                    if (NuFabs(geom->blendgeom->blend_offsets[j][i].z) < 0.00001f) {
-                        geom->blendgeom->blend_offsets[j][i].z = 0.0f;
-                    }
-                    bg = geom->blendgeom;
-                }
+    if (nblends) {
+        geom->blendgeom = (struct NUBLENDGEOM_s *)NuMemAlloc(sizeof(struct NUBLENDGEOM_s));
+        memset(geom->blendgeom, 0, sizeof(struct NUBLENDGEOM_s));
+        next_ix = 0;
+        geom->blendgeom->nblends = nblends;
+        geom->blendgeom->blend_offsets = (struct nuvec_s **)NuMemAlloc(nblends * sizeof(struct nuvec_s *));
+        memset(geom->blendgeom->blend_offsets, 0, nblends * sizeof(struct nuvec_s *));
+        nbytes = nblends * sizeof(s32);
+        geom->blendgeom->ix = (s32 *)NuMemAlloc(nbytes);
+        NuFileRead(fh, geom->blendgeom->ix, nbytes);
+        nbytes = NuFileReadInt(fh);
+        geom->blendgeom->offsets = (struct nuvec_s *)NuMemAlloc(nbytes);
+        NuFileRead(fh, geom->blendgeom->offsets, nbytes);
+        for (i = 0; i < nblends; i++) {
+            if (NuFileReadChar(fh)) {
+                geom->blendgeom->blend_offsets[i] = &geom->blendgeom->offsets[next_ix];
+                next_ix += geom->vtxcnt;
             }
         }
-        geom->blendgeom->hVB = (int)GS_CreateBuffer(geom->vtxcnt * 0xc, 3);
+        if (nbytes == 0) {
+            geom->blendgeom = NULL;
+        }
+
+        // the bg reloads below look dead but are needed for the loop/regalloc shape to match
+        bg = geom->blendgeom;
+        if (bg != NULL) {
+            for (j = 0; j < geom->vtxcnt; j++) {
+                for (i = 0; i < nblends; i++) {
+                    if (geom->blendgeom->blend_offsets[i] != NULL) {
+                        if (NuFabs(geom->blendgeom->blend_offsets[i][j].x) < 0.00001f) {
+                            geom->blendgeom->blend_offsets[i][j].x = 0.0f;
+                            bg = geom->blendgeom;
+                        }
+                        if (NuFabs(geom->blendgeom->blend_offsets[i][j].y) < 0.00001f) {
+                            geom->blendgeom->blend_offsets[i][j].y = 0.0f;
+                            bg = geom->blendgeom;
+                        }
+                        if (NuFabs(geom->blendgeom->blend_offsets[i][j].z) < 0.00001f) {
+                            geom->blendgeom->blend_offsets[i][j].z = 0.0f;
+                            bg = geom->blendgeom;
+                        }
+                        bg = geom->blendgeom;
+                    }
+                }
+            }
+            geom->blendgeom->hVB = (int)GS_CreateBuffer(geom->vtxcnt * 0xc, 3);
+        }
     }
 }
 

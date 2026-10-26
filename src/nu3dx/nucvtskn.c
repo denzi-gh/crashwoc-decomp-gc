@@ -1,6 +1,8 @@
 #include "nucvtskn.h"
+#include "../nucore/numem.h"
 
 void NuPs2CreateSkinNorm(struct nugobj_s *gobj);
+static s32 SortPrimdefs(struct primdef_s* pd, s32 cnt);
 
 
 struct primdef_s* primdefs_sorted;
@@ -171,7 +173,7 @@ static void SetVtxSkinData (struct primdef_s * pd, s32 pdix, struct nuvtx_tc1_s 
             for (ix = 0, n = 0; ix < sk->mtxcnt; ix++)
             {
               n = AddMtxToPrimDef(pd,sk->mtxid[ix]);
-              pd->weights[pdix * 5][n] = weights[ix];
+              pd->weights[pdix][n] = weights[ix];
             }
             return;
           }
@@ -180,7 +182,7 @@ static void SetVtxSkinData (struct primdef_s * pd, s32 pdix, struct nuvtx_tc1_s 
       return;
 }
 
-//86% --> equivalent?
+//MATCH GCN
 static void SetVtxSkinData2(struct primdef_s *pd,s32 pdix,struct nuvtx_tc1_s *vertexbuf,s32 vid,struct nugeom_s *currgeom)
 {
     struct NUVTXSKININFO_s *skinfo;
@@ -190,33 +192,32 @@ static void SetVtxSkinData2(struct primdef_s *pd,s32 pdix,struct nuvtx_tc1_s *ve
 
     pd->vrts[pdix] = vertexbuf[vid];
     pd->vid[pdix] = vid;
-    skinfo = &currgeom->vtxskininfo[vid];
+    skinfo = currgeom->vtxskininfo;
 
 
-    for(i = ix = 0; i != 3 && skinfo->wts[ix] != 0.0f; i++) {
-        pd->weights[pdix][AddMtxToPrimDef(pd,skinfo->joint_ixs[i])] = skinfo->wts[++ix];
+    for (i = 0; i != 3 && skinfo[vid].wts[i] != 0.0f; i++) {
+        ix = AddMtxToPrimDef(pd, skinfo[vid].joint_ixs[i]);
+        pd->weights[pdix][ix] = skinfo[vid].wts[i];
     }
 
     return;
 }
 
-//94.78%
+//MATCH GCN
 // This function creates a skinned geometry. It does this by creating an array of
 // primitives, setting vertex skin data, sorting the primitives and then creating a
 // new geometry from the sorted primitive array. A better name for this function
 void NuPs2CreateSkinNorm(struct nugobj_s *gobj) {
-    struct nugeom_s* currGeom;
-    struct nuprim_s *p;
-    struct nuvtx_tc1_s *srcvb;
-    struct primdef_s *pd;
-    u16 *vid;
+    struct nugeom_s* ge;
+    s32 n;
+    struct nuprim_s* p;
+    struct nuvtx_tc1_s* srcvb;
+    struct primdef_s* pd;
+    u16* vid;
+    s32 peak;
+    s32 mode;
     s32 pdcnt;
-    s32 skinix;
     s32 totmtx;
-    s32 ptot;
-
-    s32 iVar2;
-    s32 iVar3;
 
     memset(stats, NULL, sizeof(stats));
 
@@ -226,38 +227,38 @@ void NuPs2CreateSkinNorm(struct nugobj_s *gobj) {
     tritot = 0;
     stritot = 0;
 
-    for (currGeom = gobj->geom; currGeom != 0; currGeom = currGeom->next)
+    for (ge = gobj->geom; ge != 0; ge = ge->next)
     {
-        if (currGeom->skin == NULL && !currGeom->vtxskininfo) {
+        if (ge->skin == NULL && !ge->vtxskininfo) {
             continue;
         }
         pd = primdefs;
-        p = currGeom->prim;
+        p = ge->prim;
         pdcnt = 0;
         vid = (u16*)p->idxbuff;
-        srcvb = currGeom->hVB;
+        srcvb = ge->hVB;
         // Maximum amount of faces is 2200 (0x898)
         if ((p->cnt / 3) > 2200)
         {
             NuErrorProlog("C:/source/crashwoc/code/nu3dx/nucvtskn.c", 0x35e)("NuPs2CreateSkinNorm: TOO MANY PRIMS!");
         }
 
-        for (skinix = 0; skinix < p->cnt; skinix += 3)
+        for (n = 0; n < p->cnt; n += 3)
         {
             memset(pd, 0, sizeof(struct primdef_s));
             memset(pd->mtxid, -1, 0x3c);
 
-            if (currGeom->vtxskininfo)
+            if (ge->vtxskininfo)
             {
-                SetVtxSkinData2(pd, 0, srcvb, (s32)vid[0], currGeom);
-                SetVtxSkinData2(pd, 1, srcvb, (s32)vid[1], currGeom);
-                SetVtxSkinData2(pd, 2, srcvb, (s32)vid[2], currGeom);
+                SetVtxSkinData2(pd, 0, srcvb, vid[n], ge);
+                SetVtxSkinData2(pd, 1, srcvb, vid[n + 1], ge);
+                SetVtxSkinData2(pd, 2, srcvb, vid[n + 2], ge);
             }
             else
             {
-                SetVtxSkinData(pd, 0, srcvb, (s32)vid[0], currGeom);
-                SetVtxSkinData(pd, 1, srcvb, (s32)vid[1], currGeom);
-                SetVtxSkinData(pd, 2, srcvb, (s32)vid[2], currGeom);
+                SetVtxSkinData(pd, 0, srcvb, vid[n], ge);
+                SetVtxSkinData(pd, 1, srcvb, vid[n + 1], ge);
+                SetVtxSkinData(pd, 2, srcvb, vid[n + 2], ge);
             }
 
             if (((pd->vid[0] == pd->vid[1]) || (pd->vid[1] == pd->vid[2])) || (pd->vid[0] == pd->vid[2]))
@@ -268,21 +269,20 @@ void NuPs2CreateSkinNorm(struct nugobj_s *gobj) {
             totmtx = pd->nummtx;
             pd++;
             pdcnt++;
-            vid += 3; //vid += 6;
             stats[totmtx]++;
         }
         SortPrimdefs(primdefs,pdcnt);
-        iVar3 = 0;
-        iVar2 = 0;
-        for(skinix = 0; skinix < 15; skinix++) {
-            if ((stats[skinix] != 0) && (skinix > iVar2)) {
-                iVar2 = skinix;
+        mode = 0;
+        peak = 0;
+        for(n = 0; n < 15; n++) {
+            if ((stats[n] != 0) && (n > peak)) {
+                peak = n;
             }
-            if (stats[skinix] >= stats[iVar3]) {
-                iVar3 = skinix;
+            if (stats[n] >= stats[mode]) {
+                mode = n;
             }
         }
-        CreateSkinGeom(currGeom,primdefs,pdcnt);
+        CreateSkinGeom(ge,primdefs,pdcnt);
     }
 
 	return;
@@ -328,266 +328,191 @@ static s32 FillFreeMatrixSlots(struct primdef_s* pd, s32 cnt, s32 start) {
 }
 
 
-//78% NGC
-static s32 SortPrimdefs(struct primdef_s* pd, s32 count) {
-    s32 scnt; // r1+0x67D8
-    s32 tot; // r8
-    s32 baseid; // r19
-    s32 totsmtx; // r3
-    s32 totusmtx;
-    s32 n; // r28
-    s32 m; // r7
-    s32 o; // r5
+//MATCH GCN
+static s32 SortPrimdefs(struct primdef_s* pd, s32 cnt) {
+    s32 scnt;
+    s32 tot;
+    s32 baseid;
+    s32 totsmtx;
+    s32 n;
+    s32 m;
+    s32 o;
     s32 p;
-    s32 s; // r30
-    s32 t; // r4
-    struct primdef_s tpd; // r1+0x8
-    s32 batchmatrices[200][15]; // r1+0x180
-    s32 batchmatrices_sorted[200][15]; // r1+0x3060
-    s32 batchcount; // r1+0x67DC
-    s32 matrixusecount[150]; // r1+0x5F40
-    s32 matrixindex; // r4
-    s32 matrixcount; // r8
-    s32 maxmatrix; // r30
-    struct matchingslot_s matchingslots[200]; // r1+0x6198
-    s32 nummatches; // r6
-    s32 freeslotcount; // r11
-    s32 matrixslot; // r8
+    s32 s;
+    s32 t;
+    struct primdef_s tpd;
+    s32 batchmatrices[200][15]; //dwarf original: [15][200]
+    s32 batchmatrices_sorted[200][15]; //dwarf original: [15][200]
+    s32 batchcount;
+    s32 matrixusecount[150];
+    s32 matrixindex;
+    s32 matrixcount;
+    s32 maxmatrix;
+    struct matchingslot_s matchingslots[200];
+    s32 nummatches;
+    s32 freeslotcount;
+    s32 matrixslot;
     s32 batchnum;
-    float totalweights1; // f10
-    float totalweights2; // f9
-    float totalweights3; // f8
-    s32 totalmtx; // r5
-    s32 i; // r30 only meant to be used in a single block
-    s32 j; // r5 only meant to be used in a single block
-    
-    baseid = 0;
+    s32 totalmtx;
 
-    scnt = count;
-    
-    for (i = 0; i < scnt; i++)
-    {
-        for (j = i + 1; j < scnt; j++)
-        {
-            if (pd[j].nummtx > pd[i].nummtx) 
-            {
-                tpd = pd[i];
-                
-                pd[i] = pd[j];
-                
-                pd[j] = tpd; 
+    batchcount = 0;
+    scnt = cnt;
+
+    for (s = 0; s < scnt; s++) {
+        for (t = s + 1; t < scnt; t++) {
+            if (pd[t].nummtx > pd[s].nummtx) {
+                tpd = pd[s];
+                pd[s] = pd[t];
+                pd[t] = tpd;
             }
         }
     }
-    
-    for (m = 0, s = 0; s < scnt; s++)
-    {
-        if (pd[s].sorted == 0) 
-        {
-            memset(&mtxused, 0, sizeof(mtxused));
-            
-            for (matrixindex = 0; matrixindex < pd[s].nummtx; n++) 
-            {
-                mtxused[pd[s].mtxid[n]] = 1;
+
+    tot = 0;
+    for (s = 0; s < scnt; s++) {
+        if (pd[s].sorted == 0) {
+            memset(mtxused, 0, sizeof(mtxused));
+            for (t = 0; t < pd[s].nummtx; t++) {
+                mtxused[pd[s].mtxid[t]] = 1;
             }
-            
             pd[s].nummtx = FillFreeMatrixSlots(pd, scnt, s);
-            
-            pd[s].baseid = m;
-            
-            memcpy(&primdefs_sorted[m], &pd[s], sizeof(struct primdef_s));
-            
-            m++;
-            
-            for (j = s + 1; j < scnt; j++) 
-            {
-                if ((pd[j].sorted == 0) && (pd[s].nummtx >= pd[j].nummtx)) 
-                {
-                    for (t = 0, i = 0; i < pd[j].nummtx; i++) 
-                    {
-                        matrixslot = mtxused[pd[j].mtxid[i]] - 1;
-                        
-                        t += matrixslot > 0 ? matrixslot : -matrixslot;
+            baseid = tot;
+            pd[s].baseid = baseid;
+            primdefs_sorted[tot] = pd[s];
+            tot++;
+
+            for (t = s + 1; t < scnt; t++) {
+                if (pd[t].sorted == 0 && pd[s].nummtx >= pd[t].nummtx) {
+                    totsmtx = 0;
+                    for (p = 0; p < pd[t].nummtx; p++) {
+                        totsmtx += abs(mtxused[pd[t].mtxid[p]] - 1);
                     }
-                    
-                    if (t == 0) 
-                    {
-                        pd[j].baseid = m;
-                        
-                        memcpy(&primdefs_sorted[m], &pd[j], sizeof(struct primdef_s));
-                        
-                        pd[j].sorted = 1;
-                        
-                        for (n = 0; n < 15; n++) 
-                        {
-                            primdefs_sorted[m].mtxid[n] = -1;
-                            
-                            primdefs_sorted[m].weights[0][n] = 0.0f;
-                            primdefs_sorted[m].weights[1][n] = 0.0f;
-                            primdefs_sorted[m].weights[2][n] = 0.0f;
+                    if (totsmtx == 0) {
+                        pd[t].baseid = baseid;
+                        primdefs_sorted[tot] = pd[t];
+                        pd[t].sorted = 1;
+                        for (n = 0; n < 15; n++) {
+                            primdefs_sorted[tot].mtxid[n] = -1;
+                            primdefs_sorted[tot].weights[0][n] = 0.0f;
+                            primdefs_sorted[tot].weights[1][n] = 0.0f;
+                            primdefs_sorted[tot].weights[2][n] = 0.0f;
                         }
-                        
-                        for (n = 0; n < pd[s].nummtx; n++) 
-                        {
-                            for (t = 0; t < pd[j].nummtx; t++) 
-                            {
-                                if (pd[s].mtxid[n] == pd[j].mtxid[t]) 
-                                {
-                                    primdefs_sorted[m].weights[0][n] = pd[j].weights[0][t];
-                                    primdefs_sorted[m].weights[1][n] = pd[j].weights[1][t];
-                                    primdefs_sorted[m].weights[2][n] = pd[j].weights[2][t];
-                                    
-                                    primdefs_sorted[m].mtxid[n] = pd[s].mtxid[n];
+                        for (m = 0; m < pd[s].nummtx; m++) {
+                            for (o = 0; o < pd[t].nummtx; o++) {
+                                if (pd[s].mtxid[m] == pd[t].mtxid[o]) {
+                                    primdefs_sorted[tot].weights[0][m] = pd[t].weights[0][o];
+                                    primdefs_sorted[tot].weights[1][m] = pd[t].weights[1][o];
+                                    primdefs_sorted[tot].weights[2][m] = pd[t].weights[2][o];
+                                    primdefs_sorted[tot].mtxid[m] = pd[s].mtxid[m];
                                 }
                             }
                         }
-                        
-                        m++;
+                        tot++;
                     }
                 }
             }
-            
-            for (t = 0; t < 15; t++) 
-            {
-                batchmatrices[baseid][t] = primdefs_sorted[baseid].mtxid[t];
+
+            for (n = 0; n < 15; n++) {
+                batchmatrices[batchcount][n] = primdefs_sorted[baseid].mtxid[n];
             }
-            
-            baseid++;
+            batchcount++;
         }
     }
-    
+
     memset(matrixusecount, 0, sizeof(matrixusecount));
-    
-    for (batchnum = -1, m = 0; m < baseid; m++) 
-    {
-        for (s = 0; s < 15; s++)
-        {
-            if (batchmatrices[m][s] != -1) 
-            {
-                matrixusecount[batchmatrices[m][s]]++;
-                
-                if (batchmatrices[m][s] < batchnum) 
-                {
-                    batchnum = batchmatrices[m][s];
-                }
+    maxmatrix = -1;
+    for (s = 0; s < batchcount; s++) {
+        for (t = 0; t < 15; t++) {
+            if (batchmatrices[s][t] != -1) {
+                matrixusecount[batchmatrices[s][t]]++;
+                maxmatrix = (batchmatrices[s][t] < maxmatrix) ? maxmatrix : batchmatrices[s][t];
             }
         }
     }
-    
+
     memset(batchmatrices_sorted, -1, sizeof(batchmatrices_sorted));
 
-    for ( ; ; )
-    {
-        for (m = 0, matrixcount = matrixusecount[m], o = 0; o <= batchnum; o++) 
-        {
-            if (matrixusecount[o] > matrixusecount[m]) 
-            {
-                matrixcount = matrixusecount[o];
-                
-                m = o;
+    do {
+        matrixindex = 0;
+        matrixcount = matrixusecount[matrixindex];
+        for (s = 0; s <= maxmatrix; s++) {
+            if (matrixusecount[s] > matrixusecount[matrixindex]) {
+                matrixcount = matrixusecount[s];
+                matrixindex = s;
             }
         }
 
-        if (matrixcount == 0) 
-        {
-            break;
-        }
-        
-        for (o = 0, p = 0, s = 0; s < baseid; s++) 
-        {
-            for (j = 0; j < 15; j++) 
-            {
-                if (batchmatrices[s][j] == m) 
-                {
-                    matchingslots[p].batch = s;
-                    
-                    matchingslots[p].slot = j;
-                    
-                    p++;
-                    o++;
+        if (matrixcount != 0) {
+            nummatches = 0;
+            for (s = 0; s < batchcount; s++) {
+                for (t = 0; t < 15; t++) {
+                    if (batchmatrices[s][t] == matrixindex) {
+                        matchingslots[nummatches].batch = s;
+                        matchingslots[nummatches].slot = t;
+                        nummatches++;
+                    }
                 }
             }
-        }
-        
-        for (o = 0; ; )
-        { 
-            for (t = 0, s = 0; s < o; s++) 
-            {
-                if (batchmatrices_sorted[matchingslots[s].batch][p] == -1) 
-                {
-                    t++;
-                }
-            }
-            
-            o++;
-            
-            if (t < o) 
-            {
-                if (o > 14) 
-                {
-                    NuErrorProlog("C:/source/crashwoc/code/nu3dx/nucvtskn.c", 562)("SortPrimDefs: Unable to find a matching free slot in all batches!!");
-                    break;
-                }
-            }
-        }
-            
-        for (p = 0; p < o; p++) 
-        {
-            batchmatrices_sorted[matchingslots[p].batch][o] = o;
-            
-            matrixusecount[m] = 0;
-        }
-    }
-    
-    for (m = 0, baseid = 0, o = 0; o < scnt; o++) 
-    {
-        if (primdefs_sorted[baseid].baseid != baseid) 
-        {
-            baseid = primdefs_sorted[baseid].baseid;
-            
-            m++;
-        }
-        
-        memcpy(&primdefs_sorted[baseid], &pd[baseid], sizeof(struct primdef_s));
-        
-        for (s = 0; s < 15; s++) 
-        {
-            pd[o].mtxid[s] = -1;
-            
-            pd[o].weights[0][s] = 0.0f;
-            pd[o].weights[1][s] = 0.0f;
-            pd[o].weights[2][s] = 0.0f;
-        }
-        
-        pd[o].nummtx = &primdefs_sorted[o].nummtx; 
 
-        pd[o].baseid = &primdefs_sorted[o].baseid;
-        
-        for (s = 0; s < 15; s++) 
-        {
-            for (t = 0; t < 15; t++) 
-            {
-                if (batchmatrices_sorted[m][o] == primdefs_sorted[o].mtxid[t]) 
-                {
-                    pd[o].weights[0][s] = primdefs_sorted[o].weights[0][t];
-                    pd[o].weights[1][s] = primdefs_sorted[o].weights[1][t];
-                    pd[o].weights[2][s] = primdefs_sorted[o].weights[2][t];
-                   
-                    pd[o].mtxid[s] = primdefs_sorted[o].mtxid[t];
+            matrixslot = 0;
+            freeslotcount = 0;
+            while (freeslotcount < nummatches && matrixslot < 15) {
+                freeslotcount = 0;
+                for (t = 0; t < nummatches; t++) {
+                    if (batchmatrices_sorted[matchingslots[t].batch][matrixslot] == -1) {
+                        freeslotcount++;
+                    }
+                }
+                matrixslot++;
+            }
+
+            if (freeslotcount < nummatches) {
+                NuErrorProlog("C:/source/crashwoc/code/nu3dx/nucvtskn.c", 0x232)("SortPrimDefs: Unable to find a matching free slot in all batches!!");
+            } else {
+                matrixslot--;
+                for (s = 0; s < nummatches; s++) {
+                    batchmatrices_sorted[matchingslots[s].batch][matrixslot] = matrixindex;
+                    matrixusecount[matrixindex] = 0;
+                }
+            }
+        }
+    } while (matrixcount != 0);
+
+    batchnum = 0;
+    baseid = 0;
+    for (s = 0; s < scnt; s++) {
+        if (primdefs_sorted[s].baseid != baseid) {
+            baseid = primdefs_sorted[s].baseid;
+            batchnum++;
+        }
+        pd[s] = primdefs_sorted[s];
+        for (n = 0; n < 15; n++) {
+            pd[s].mtxid[n] = -1;
+            pd[s].weights[0][n] = 0.0f;
+            pd[s].weights[1][n] = 0.0f;
+            pd[s].weights[2][n] = 0.0f;
+        }
+        pd[s].nummtx = primdefs_sorted[baseid].nummtx;
+        pd[s].baseid = baseid;
+        for (n = 0; n < 15; n++) {
+            for (t = 0; t < 15; t++) {
+                if (batchmatrices_sorted[batchnum][n] == primdefs_sorted[s].mtxid[t]) {
+                    pd[s].weights[0][n] = primdefs_sorted[s].weights[0][t];
+                    pd[s].weights[1][n] = primdefs_sorted[s].weights[1][t];
+                    pd[s].weights[2][n] = primdefs_sorted[s].weights[2][t];
+                    pd[s].mtxid[n] = primdefs_sorted[s].mtxid[t];
                 }
             }
         }
     }
-    
-    for (totalmtx = 0, baseid = -1, s = 0; s < n; s++) 
-    {
-        if (primdefs_sorted[s].baseid != baseid) 
-        {
+
+    totalmtx = 0;
+    baseid = -1;
+    for (s = 0; s < tot; s++) {
+        if (primdefs_sorted[s].baseid != baseid) {
             totalmtx += primdefs_sorted[s].nummtx;
-            
             baseid = primdefs_sorted[s].baseid;
         }
     }
-    
     return totalmtx;
 }

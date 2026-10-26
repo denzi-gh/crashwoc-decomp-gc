@@ -468,241 +468,157 @@ void NuBridgeDraw(struct nugscn_s *scn,struct numtl_s *mtl) {
     return;
 }
 
-//63.80% NGC
+#define BRIDGE_CONTACT_FRAMES 5
+#define PLANK_SUM(p, c) ((p)[0].c + (p)[1].c)
+#define PLANK_SPAN(p, c) ((p)[1].c - (p)[0].c)
+#define ROPE_SPRING(v, near, here, k) ((v) += NuFabs((near) - (here)) * ((near) - (here)) * (k) * 0.5f + ((near) - (here)) * (k))
+
+//NGC MATCH
 void NuBridgeUpdate(struct nuvec_s* playerpos) {
-    s32 i;
-    s32 lp;
-    BridgeType* bridge;
     struct nuvec_s dir;
-    s32 gsec;
-    float ratio;
-    float ratio2;
-    float gn;
-    float gf;
-    float dot;
-    float dx;
-    float dy;
-    float dz;
-    float dist_sq;
-    
-    if (NuBridgeProc != 0) {
+    s32 i;
+    BridgeType* bridge;
+    float t;
+    float side;
+    float len;
+    float level;
+    s32 seg;
+    s32 j;
+
+    if (NuBridgeProc) {
         bridge = Bridges;
         for (i = 0; i < BridgeFree; i++, bridge++) {
-            dx = bridge->center.x - global_camera.mtx._30;
-            dy = bridge->center.y - global_camera.mtx._31;
-            dz = bridge->center.z - global_camera.mtx._32;
-            dist_sq = dx * dx + dy * dy + dz * dz;
-            
-            if (dist_sq < (global_camera.farclip * global_camera.farclip + bridge->radius)) {
+            if (SQR(bridge->center.x - global_camera.mtx._30)
+                + SQR(bridge->center.y - global_camera.mtx._31)
+                + SQR(bridge->center.z - global_camera.mtx._32)
+                < global_camera.farclip * global_camera.farclip + bridge->radius) {
                 bridge->inrange = 1;
-                
-                if (bridge->onscreen != 0) {
+                if (bridge->onscreen) {
                     if (bridge->hit != 0) {
-                        gsec = bridge->sections - 1;
-                        
-                        dir.x = ((bridge->pos[gsec][0].x + bridge->pos[gsec][1].x) - 
-                                bridge->pos[0][0].x - bridge->pos[0][1].x) * 0.5f;
-                        
-                        dir.y = ((bridge->pos[0][0].y + bridge->pos[0][1].y) * 0.5f);
-                        
-                        dir.z = ((bridge->pos[gsec][0].z + bridge->pos[gsec][1].z) - 
-                                bridge->pos[0][0].z - bridge->pos[0][1].z) * 0.5f;
-                        
-                        dot = dir.x * dir.x + dir.z * dir.z;
-                        
-                        
-                        ratio = ((dir.x * (playerpos->x - (bridge->pos[0][0].x + bridge->pos[0][1].x) * 0.5f) +
-                                 dir.z * (playerpos->z - dir.y)) * (float)gsec) / dot;
-                        
-                        if (ratio < 0.0f) {
-                            ratio = 0.0f;
+                        dir.x = (PLANK_SUM(bridge->pos[bridge->sections - 1], x)
+                                 - bridge->pos[0][0].x - bridge->pos[0][1].x) * 0.5f;
+                        dir.z = (PLANK_SUM(bridge->pos[bridge->sections - 1], z)
+                                 - bridge->pos[0][0].z - bridge->pos[0][1].z) * 0.5f;
+                        t = dir.x * (playerpos->x - PLANK_SUM(bridge->pos[0], x) * 0.5f)
+                          + dir.z * (playerpos->z - PLANK_SUM(bridge->pos[0], z) * 0.5f);
+                        t = t * (bridge->sections - 1) / (dir.x * dir.x + dir.z * dir.z);
+                        if (t < 0.0f) {
+                            t = 0.0f;
                         }
-                        gn = ((gsec) - 1.0f);
-                        //gn = (float)gsec;
-                        if (ratio > gn) {
-                            gsec = (s32)ratio;
+                        if (t > bridge->sections - 1.0f) {
+                            t = bridge->sections - 1.0f;
                         }
-                        ratio -= (float)gsec;
-                        
-                        ratio2 = (2.0f / (NuFsqrt(dot) * bridge->width)) *
-                                (dir.z * (playerpos->x - (bridge->pos[0][0].x + bridge->pos[0][1].x) * 0.5f) +
-                                 dir.x * ((bridge->pos[0][0].z + bridge->pos[0][1].z) * 0.5f - playerpos->z));
-                        
-                        if (ratio2 > 1.0f) {
-                            ratio2 = 1.0f;
+                        seg = t;
+                        t -= seg;
+                        len = NuFsqrt(dir.x * dir.x + dir.z * dir.z);
+                        side = 2.0f / (len * bridge->width);
+                        side *= dir.z * (playerpos->x - PLANK_SUM(bridge->pos[0], x) * 0.5f)
+                              + dir.x * (PLANK_SUM(bridge->pos[0], z) * 0.5f - playerpos->z);
+                        if (side > 1.0f) {
+                            side = 1.0f;
                         }
-                        if (ratio2 < -1.0f) {
-                            ratio2 = -1.0f;
+                        if (side < -1.0f) {
+                            side = -1.0f;
                         }
-                        
-                        gf = bridge->gravity * (ratio2 + 3.0f) * 0.25f;
-                        gn = bridge->gravity * (3.0f - ratio2) * 0.25f;
-                        
-                        if (ratio == 0.0f) {
-                            if (gsec > 0 && gsec < bridge->sections - 1) {
-                                bridge->vel[gsec][0].y += gn * bridge->plrweight;
-                                bridge->vel[gsec][1].y += gf * bridge->plrweight;
+                        len = bridge->gravity * (3.0f - side) * 0.25f;
+                        level = bridge->gravity * (side + 3.0f) * 0.25f;
+                        if (t == 0.0f) {
+                            if (seg > 0 && seg < bridge->sections - 1) {
+                                bridge->vel[seg][0].y += len * bridge->plrweight;
+                                bridge->vel[seg][1].y += level * bridge->plrweight;
                             }
                         } else {
-                            if (gsec > 0 && gsec < bridge->sections - 1) {
-                                bridge->vel[gsec][0].y += gn * bridge->plrweight * (1.0f - ratio);
-                                bridge->vel[gsec][1].y += gf * bridge->plrweight * (1.0f - ratio);
+                            if (seg > 0 && seg < bridge->sections - 1) {
+                                bridge->vel[seg][0].y += len * bridge->plrweight * (1.0f - t);
+                                bridge->vel[seg][1].y += level * bridge->plrweight * (1.0f - t);
                             }
-                            if (gsec + 1 < bridge->sections - 1) {
-                                bridge->vel[gsec + 1][0].y += gn * bridge->plrweight * ratio;
-                                bridge->vel[gsec + 1][1].y += gf * bridge->plrweight * ratio;
+                            if (seg + 1 < bridge->sections - 1) {
+                                bridge->vel[seg + 1][0].y += len * bridge->plrweight * t;
+                                bridge->vel[seg + 1][1].y += level * bridge->plrweight * t;
                             }
                         }
                         bridge->hit--;
                     } else {
-                        gsec++;
+                        side = 0.0f;
                     }
-                    
-                    if (PlatInstGetHit((s32)bridge->plat[0]) != 0) {
-                        bridge->hit = 5;
+                    if (PlatInstGetHit(bridge->plat[0])) {
+                        bridge->hit = BRIDGE_CONTACT_FRAMES;
                     }
-                    if (PlatInstGetHit((s32)bridge->plat[bridge->sections - 1]) != 0) {
-                        bridge->hit = 5;
+                    if (PlatInstGetHit(bridge->plat[bridge->sections - 1])) {
+                        bridge->hit = BRIDGE_CONTACT_FRAMES;
                     }
-                    
-                    for (lp = 1; lp < bridge->sections - 1; lp++) {
-                        // Damping velocities
-                        bridge->vel[lp][0].x -= bridge->vel[lp][0].x * bridge->damp;
-                        bridge->vel[lp][0].y += bridge->gravity - bridge->vel[lp][0].y * bridge->damp;
-                        bridge->vel[lp][0].z -= bridge->vel[lp][0].z * bridge->damp;
-                        
-                        bridge->vel[lp][1].x -= bridge->vel[lp][1].x * bridge->damp;
-                        bridge->vel[lp][1].y += bridge->gravity - bridge->vel[lp][1].y * bridge->damp;
-                        bridge->vel[lp][1].z -= bridge->vel[lp][1].z * bridge->damp;
-                        
-                        if (PlatInstGetHit((s32)bridge->plat[lp]) != 0) {
-                            bridge->hit = 5;
+                    for (j = 1; j < bridge->sections - 1; j++) {
+                        bridge->vel[j][0].x += -bridge->vel[j][0].x * bridge->damp;
+                        bridge->vel[j][0].y += bridge->gravity - bridge->vel[j][0].y * bridge->damp;
+                        bridge->vel[j][0].z += -bridge->vel[j][0].z * bridge->damp;
+                        bridge->vel[j][1].x += -bridge->vel[j][1].x * bridge->damp;
+                        bridge->vel[j][1].y += bridge->gravity - bridge->vel[j][1].y * bridge->damp;
+                        bridge->vel[j][1].z += -bridge->vel[j][1].z * bridge->damp;
+                        if (PlatInstGetHit(bridge->plat[j])) {
+                            bridge->hit = BRIDGE_CONTACT_FRAMES;
                         }
-                        
-                        // Spring forces - previous segment to current (side 0)
-                        dx = bridge->pos[lp][0].x - bridge->pos[lp - 1][0].x;
-                        dy = bridge->pos[lp][0].y - bridge->pos[lp - 1][0].y;
-                        dz = bridge->pos[lp][0].z - bridge->pos[lp - 1][0].z;
-                        
-                        bridge->vel[lp][0].x += NuFabs(dx) * dx * bridge->tension * 0.5f + dx * bridge->tension;
-                        bridge->vel[lp][0].y += NuFabs(dy) * dy * bridge->tension * 0.5f + dy * bridge->tension;
-                        bridge->vel[lp][0].z += NuFabs(dz) * dz * bridge->tension * 0.5f + dz * bridge->tension;
-                        
-                        // Spring forces - current to next segment (side 0)
-                        dx = bridge->pos[lp + 1][0].x - bridge->pos[lp][0].x;
-                        dy = bridge->pos[lp + 1][0].y - bridge->pos[lp][0].y;
-                        dz = bridge->pos[lp + 1][0].z - bridge->pos[lp][0].z;
-                        
-                        bridge->vel[lp][0].x += NuFabs(dx) * dx * bridge->tension * 0.5f + dx * bridge->tension;
-                        bridge->vel[lp][0].y += NuFabs(dy) * dy * bridge->tension * 0.5f + dy * bridge->tension;
-                        bridge->vel[lp][0].z += NuFabs(dz) * dz * bridge->tension * 0.5f + dz * bridge->tension;
-                        
-                        // Spring forces - previous segment to current (side 1)
-                        dx = bridge->pos[lp][1].x - bridge->pos[lp - 1][1].x;
-                        dy = bridge->pos[lp][1].y - bridge->pos[lp - 1][1].y;
-                        dz = bridge->pos[lp][1].z - bridge->pos[lp - 1][1].z;
-                        
-                        bridge->vel[lp][1].x += NuFabs(dx) * dx * bridge->tension * 0.5f + dx * bridge->tension;
-                        bridge->vel[lp][1].y += NuFabs(dy) * dy * bridge->tension * 0.5f + dy * bridge->tension;
-                        bridge->vel[lp][1].z += NuFabs(dz) * dz * bridge->tension * 0.5f + dz * bridge->tension;
-                        
-                        // Spring forces - current to next segment (side 1)
-                        dx = bridge->pos[lp + 1][1].x - bridge->pos[lp][1].x;
-                        dy = bridge->pos[lp + 1][1].y - bridge->pos[lp][1].y;
-                        dz = bridge->pos[lp + 1][1].z - bridge->pos[lp][1].z;
-                        
-                        bridge->vel[lp][1].x += NuFabs(dx) * dx * bridge->tension * 0.5f + dx * bridge->tension;
-                        bridge->vel[lp][1].y += NuFabs(dy) * dy * bridge->tension * 0.5f + dy * bridge->tension;
-                        bridge->vel[lp][1].z += NuFabs(dz) * dz * bridge->tension * 0.5f + dz * bridge->tension;
+                        ROPE_SPRING(bridge->vel[j][0].x, bridge->pos[j - 1][0].x, bridge->pos[j][0].x, bridge->tension);
+                        ROPE_SPRING(bridge->vel[j][0].y, bridge->pos[j - 1][0].y, bridge->pos[j][0].y, bridge->tension);
+                        ROPE_SPRING(bridge->vel[j][0].z, bridge->pos[j - 1][0].z, bridge->pos[j][0].z, bridge->tension);
+                        ROPE_SPRING(bridge->vel[j][0].x, bridge->pos[j + 1][0].x, bridge->pos[j][0].x, bridge->tension);
+                        ROPE_SPRING(bridge->vel[j][0].y, bridge->pos[j + 1][0].y, bridge->pos[j][0].y, bridge->tension);
+                        ROPE_SPRING(bridge->vel[j][0].z, bridge->pos[j + 1][0].z, bridge->pos[j][0].z, bridge->tension);
+                        ROPE_SPRING(bridge->vel[j][1].x, bridge->pos[j - 1][1].x, bridge->pos[j][1].x, bridge->tension);
+                        ROPE_SPRING(bridge->vel[j][1].y, bridge->pos[j - 1][1].y, bridge->pos[j][1].y, bridge->tension);
+                        ROPE_SPRING(bridge->vel[j][1].z, bridge->pos[j - 1][1].z, bridge->pos[j][1].z, bridge->tension);
+                        ROPE_SPRING(bridge->vel[j][1].x, bridge->pos[j + 1][1].x, bridge->pos[j][1].x, bridge->tension);
+                        ROPE_SPRING(bridge->vel[j][1].y, bridge->pos[j + 1][1].y, bridge->pos[j][1].y, bridge->tension);
+                        ROPE_SPRING(bridge->vel[j][1].z, bridge->pos[j + 1][1].z, bridge->pos[j][1].z, bridge->tension);
                     }
-                    
-                    for (lp = 1; lp < bridge->sections - 1; lp++) {
-                        bridge->pos[lp][0].x += bridge->vel[lp][0].x;
-                        bridge->pos[lp][0].y += bridge->vel[lp][0].y;
-                        bridge->pos[lp][0].z += bridge->vel[lp][0].z;
-                        
-                        bridge->pos[lp][1].x += bridge->vel[lp][1].x;
-                        bridge->pos[lp][1].y += bridge->vel[lp][1].y;
-                        bridge->pos[lp][1].z += bridge->vel[lp][1].z;
-                        
-                        NuMtxSetRotationY(&bridge->mtx[lp], (s32)bridge->yang);
-                        
-                        dx = bridge->pos[lp][1].x - bridge->pos[lp][0].x;
-                        dz = bridge->pos[lp][1].z - bridge->pos[lp][0].z;
-                        dist_sq = NuFsqrt(dx * dx + dz * dz);
-                        
-                        NuMtxPreRotateX(&bridge->mtx[lp], 
-                            NuAtan2D(bridge->pos[lp][1].y - bridge->pos[lp][0].y, dist_sq));
-                        
-                        dx = (bridge->pos[lp + 1][0].x + bridge->pos[lp + 1][1].x) -
-                             (bridge->pos[lp - 1][0].x + bridge->pos[lp - 1][1].x);
-                        dz = (bridge->pos[lp + 1][0].z + bridge->pos[lp + 1][1].z) -
-                             (bridge->pos[lp - 1][0].z + bridge->pos[lp - 1][1].z);
-                        dist_sq = NuFsqrt(dx * dx + dz * dz);
-                        
-                        dy = (bridge->pos[lp + 1][0].y + bridge->pos[lp + 1][1].y) -
-                             (bridge->pos[lp - 1][0].y + bridge->pos[lp - 1][1].y);
-                        
-                        NuMtxPreRotateZ(&bridge->mtx[lp], NuAtan2D(dy, dist_sq));
-                        
-                        bridge->mtx[lp]._30 = (bridge->pos[lp][0].x + bridge->pos[lp][1].x) * 0.5f;
-                        bridge->mtx[lp]._31 = (bridge->pos[lp][0].y + bridge->pos[lp][1].y) * 0.5f;
-                        bridge->mtx[lp]._32 = (bridge->pos[lp][0].z + bridge->pos[lp][1].z) * 0.5f;
+                    for (j = 1; j < bridge->sections - 1; j++) {
+                        bridge->pos[j][0].x += bridge->vel[j][0].x;
+                        bridge->pos[j][0].y += bridge->vel[j][0].y;
+                        bridge->pos[j][0].z += bridge->vel[j][0].z;
+                        bridge->pos[j][1].x += bridge->vel[j][1].x;
+                        bridge->pos[j][1].y += bridge->vel[j][1].y;
+                        bridge->pos[j][1].z += bridge->vel[j][1].z;
+                        NuMtxSetRotationY(&bridge->mtx[j], bridge->yang);
+                        len = NuFsqrt(SQR(PLANK_SPAN(bridge->pos[j], x))
+                                      + SQR(PLANK_SPAN(bridge->pos[j], z)));
+                        NuMtxPreRotateX(&bridge->mtx[j], NuAtan2D(PLANK_SPAN(bridge->pos[j], y), len));
+                        len = NuFsqrt(SQR(PLANK_SUM(bridge->pos[j + 1], x) - bridge->pos[j - 1][0].x
+                                          - bridge->pos[j - 1][1].x)
+                                      + SQR(PLANK_SUM(bridge->pos[j + 1], z) - bridge->pos[j - 1][0].z
+                                            - bridge->pos[j - 1][1].z));
+                        NuMtxPreRotateZ(&bridge->mtx[j], NuAtan2D(PLANK_SUM(bridge->pos[j + 1], y)
+                                                                  - bridge->pos[j - 1][0].y - bridge->pos[j - 1][1].y, len));
+                        bridge->mtx[j]._30 = PLANK_SUM(bridge->pos[j], x) * 0.5f;
+                        bridge->mtx[j]._31 = PLANK_SUM(bridge->pos[j], y) * 0.5f;
+                        bridge->mtx[j]._32 = PLANK_SUM(bridge->pos[j], z) * 0.5f;
                     }
-                    
-                    // First segment matrix
-                    NuMtxSetRotationY(&bridge->mtx[0], (s32)bridge->yang);
-                    
-                    dx = bridge->pos[1][0].x - bridge->pos[0][0].x;
-                    dz = bridge->pos[1][0].z - bridge->pos[0][0].z;
-                    dist_sq = NuFsqrt(dx * dx + dz * dz);
-                    
-                    NuMtxPreRotateX(&bridge->mtx[0], 
-                        NuAtan2D(bridge->pos[1][0].y - bridge->pos[0][0].y, dist_sq));
-                    
-                    dx = (bridge->pos[2][0].x + bridge->pos[2][1].x) -
-                         (bridge->pos[0][0].x + bridge->pos[0][1].x);
-                    dz = (bridge->pos[2][0].z + bridge->pos[2][1].z) -
-                         (bridge->pos[0][0].z + bridge->pos[0][1].z);
-                    dist_sq = NuFsqrt(dx * dx + dz * dz);
-                    
-                    gf = (bridge->pos[0][0].y + bridge->pos[0][1].y + 
-                          bridge->pos[2][0].y + bridge->pos[2][1].y) * 0.25f;
-                    
-                    NuMtxPreRotateZ(&bridge->mtx[0], 
-                        NuAtan2D((bridge->pos[2][0].y + bridge->pos[2][1].y) - gf * 2.0f, dist_sq));
-                    
-                    bridge->mtx[0]._30 = (bridge->pos[0][0].x + bridge->pos[0][1].x) * 0.5f;
-                    bridge->mtx[0]._31 = gf;
-                    bridge->mtx[0]._32 = (bridge->pos[0][0].z + bridge->pos[0][1].z) * 0.5f;
-                    
-                    // Last segment matrix
-                    gsec = bridge->sections - 1;
-                    NuMtxSetRotationY(&bridge->mtx[gsec], (s32)bridge->yang);
-                    
-                    dx = bridge->pos[gsec][1].x - bridge->pos[gsec][0].x;
-                    dz = bridge->pos[gsec][1].z - bridge->pos[gsec][0].z;
-                    dist_sq = NuFsqrt(dx * dx + dz * dz);
-                    
-                    NuMtxPreRotateX(&bridge->mtx[gsec], 
-                        NuAtan2D(bridge->pos[gsec][1].y - bridge->pos[gsec][0].y, dist_sq));
-                    
-                    dx = (bridge->pos[gsec][0].x + bridge->pos[gsec][1].x) -
-                         (bridge->pos[gsec - 1][0].x + bridge->pos[gsec - 1][1].x);
-                    dz = (bridge->pos[gsec][0].z + bridge->pos[gsec][1].z) -
-                         (bridge->pos[gsec - 1][0].z + bridge->pos[gsec - 1][1].z);
-                    dist_sq = NuFsqrt(dx * dx + dz * dz);
-                    
-                    dy = (bridge->pos[gsec][0].y + bridge->pos[gsec][1].y) -
-                         (bridge->pos[gsec - 1][0].y + bridge->pos[gsec - 1][1].y);
-                    
-                    gf = (bridge->pos[gsec][0].y + bridge->pos[gsec][1].y + dy) * 0.25f;
-                    
-                    NuMtxPreRotateZ(&bridge->mtx[gsec - 1], NuAtan2D(dy - gf * 2.0f, dist_sq));
-                    
-                    bridge->mtx[gsec]._30 = (bridge->pos[gsec][0].x + bridge->pos[gsec][1].x) * 0.5f;
-                    bridge->mtx[gsec]._31 = gf;
-                    bridge->mtx[gsec]._32 = (bridge->pos[gsec][0].z + bridge->pos[gsec][1].z) * 0.5f;
+                    NuMtxSetRotationY(&bridge->mtx[0], bridge->yang);
+                    len = NuFsqrt(SQR(PLANK_SPAN(bridge->pos[0], x))
+                                  + SQR(PLANK_SPAN(bridge->pos[0], z)));
+                    NuMtxPreRotateX(&bridge->mtx[0], NuAtan2D(PLANK_SPAN(bridge->pos[0], y), len));
+                    len = NuFsqrt(SQR(PLANK_SUM(bridge->pos[1], x) - bridge->pos[0][0].x - bridge->pos[0][1].x)
+                                  + SQR(PLANK_SUM(bridge->pos[1], z) - bridge->pos[0][0].z - bridge->pos[0][1].z));
+                    level = (PLANK_SUM(bridge->pos[0], y) + bridge->pos[1][0].y + bridge->pos[1][1].y) * 0.25f;
+                    NuMtxPreRotateZ(&bridge->mtx[0], NuAtan2D(PLANK_SUM(bridge->pos[1], y) - (level + level), len));
+                    bridge->mtx[0]._30 = PLANK_SUM(bridge->pos[0], x) * 0.5f;
+                    bridge->mtx[0]._31 = level;
+                    bridge->mtx[0]._32 = PLANK_SUM(bridge->pos[0], z) * 0.5f;
+                    NuMtxSetRotationY(&bridge->mtx[bridge->sections - 1], bridge->yang);
+                    len = NuFsqrt(SQR(PLANK_SPAN(bridge->pos[bridge->sections - 2], x))
+                                  + SQR(PLANK_SPAN(bridge->pos[bridge->sections - 2], z)));
+                    NuMtxPreRotateX(&bridge->mtx[0], NuAtan2D(PLANK_SPAN(bridge->pos[bridge->sections - 2], y), len));
+                    len = NuFsqrt(SQR(PLANK_SUM(bridge->pos[bridge->sections - 1], x)
+                                      - bridge->pos[bridge->sections - 2][0].x
+                                      - bridge->pos[bridge->sections - 2][1].x)
+                                  + SQR(PLANK_SUM(bridge->pos[bridge->sections - 1], z)
+                                        - bridge->pos[bridge->sections - 2][0].z
+                                        - bridge->pos[bridge->sections - 2][1].z));
+                    level = (PLANK_SUM(bridge->pos[bridge->sections - 1], y) + bridge->pos[bridge->sections - 2][0].y
+                             + bridge->pos[bridge->sections - 2][1].y) * 0.25f;
+                    NuMtxPreRotateZ(&bridge->mtx[bridge->sections - 1],
+                                    NuAtan2D(PLANK_SUM(bridge->pos[bridge->sections - 1], y) - (level + level), len));
+                    bridge->mtx[bridge->sections - 1]._30 = PLANK_SUM(bridge->pos[bridge->sections - 1], x) * 0.5f;
+                    bridge->mtx[bridge->sections - 1]._31 = level;
+                    bridge->mtx[bridge->sections - 1]._32 = PLANK_SUM(bridge->pos[bridge->sections - 1], z) * 0.5f;
                 }
             } else {
                 bridge->inrange = 0;

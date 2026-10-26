@@ -62,69 +62,73 @@ struct lights_s
 
 struct lights_s Lights[320];
 
-//96% NGC - BLOCKER: r28/r29 register swap in main loop + scheduling in loop tail (i++ and offset++ order around NuFileReadInt)
+//NGC MATCH
 void LoadLights(void) {
-    s32 handle;
+    s32 fh;
     s32 i;
+    s32 glbdirexists;
+    s32 glbambexists;
     void* fbuff;
     s32 fsize;
 
-    POINTCOUNT = 0;
     LIGHTCOUNT = 0;
     AMBIENTCOUNT = 0;
     DIRECTCOUNT = 0;
-    for (fsize = 0; fsize < 0x100; fsize++) {
-        Lights[fsize].type = -1;
+    POINTCOUNT = 0;
+    for (i = 0; i < 256; i++) {
+        Lights[i].type = -1;
     }
     sprintf(tbuf, "%s.lgt", LevelFileName);
-    i = 0x100;
     if (NuFileExists(tbuf) != 0) {
         fbuff = Chase;
         fsize = NuFileLoadBuffer(tbuf, fbuff, 0x7fffffff);
-        handle = NuMemFileOpen(fbuff, fsize, NUFILE_READ);
-        if (handle != 0) {
-            LIGHTCOUNT = NuFileReadInt(handle);
-            AMBIENTCOUNT = NuFileReadInt(handle);
-            DIRECTCOUNT = NuFileReadInt(handle);
-            POINTCOUNT = NuFileReadInt(handle);
-            if (0x100 < LIGHTCOUNT) {
-                LIGHTCOUNT = 0x100;
+        fh = NuMemFileOpen(fbuff, fsize, NUFILE_READ);
+        if (fh != 0) {
+            LIGHTCOUNT = NuFileReadInt(fh);
+            AMBIENTCOUNT = NuFileReadInt(fh);
+            DIRECTCOUNT = NuFileReadInt(fh);
+            POINTCOUNT = NuFileReadInt(fh);
+            if (LIGHTCOUNT > 256) {
+                LIGHTCOUNT = 256;
             }
-            for (i = 0; i < LIGHTCOUNT; ) {
-                Lights[i].type = NuFileReadInt(handle);
-                Lights[i].pos.x = NuFileReadFloat(handle);
-                Lights[i].pos.y = NuFileReadFloat(handle);
-                Lights[i].pos.z = NuFileReadFloat(handle);
-                Lights[i].radius_pos.x = NuFileReadFloat(handle);
-                Lights[i].radius_pos.y = NuFileReadFloat(handle);
-                Lights[i].radius_pos.z = NuFileReadFloat(handle);
-                Lights[i].radius = NuFileReadFloat(handle);
-                Lights[i].r = NuFileReadChar(handle);
-                Lights[i].g = NuFileReadChar(handle);
-                Lights[i].b = NuFileReadChar(handle);
-                Lights[i].colour.r = NuFileReadFloat(handle);
-                Lights[i].colour.g = NuFileReadFloat(handle);
-                Lights[i].colour.b = NuFileReadFloat(handle);
+            glbdirexists = 0;
+            glbambexists = 0;
+            for (i = 0; i < LIGHTCOUNT; i++) {
+                Lights[i].type = NuFileReadInt(fh);
+                Lights[i].pos.x = NuFileReadFloat(fh);
+                Lights[i].pos.y = NuFileReadFloat(fh);
+                Lights[i].pos.z = NuFileReadFloat(fh);
+                Lights[i].radius_pos.x = NuFileReadFloat(fh);
+                Lights[i].radius_pos.y = NuFileReadFloat(fh);
+                Lights[i].radius_pos.z = NuFileReadFloat(fh);
+                Lights[i].radius = NuFileReadFloat(fh);
+                Lights[i].r = NuFileReadChar(fh);
+                Lights[i].g = NuFileReadChar(fh);
+                Lights[i].b = NuFileReadChar(fh);
+                Lights[i].colour.r = NuFileReadFloat(fh);
+                Lights[i].colour.g = NuFileReadFloat(fh);
+                Lights[i].colour.b = NuFileReadFloat(fh);
                 if (Lights[i].type == 1 || Lights[i].type == 2) {
-                    Lights[i].direction.x = NuFileReadFloat(handle);
-                    Lights[i].direction.y = NuFileReadFloat(handle);
-                    i++;i--;
-                    Lights[i].direction.z = NuFileReadFloat(handle);
+                    Lights[i].direction.x = NuFileReadFloat(fh);
+                    Lights[i].direction.y = NuFileReadFloat(fh);
+                    Lights[i].direction.z = NuFileReadFloat(fh);
                 }
-                Lights[i].globalflag = (u8)NuFileReadInt(handle);
-                switch (Lights[i].globalflag) {
-                    case 4:
-                        Lights[i++].brightness = (u8)NuFileReadInt(handle);
-                        break;
-                    default:
-                        Lights[i++].brightness = (u8)NuFileReadInt(handle);
-                        break;
+                Lights[i].globalflag = NuFileReadInt(fh);
+                if (Lights[i].globalflag == 4) {
+                    if (Lights[i].type == 1) {
+                        glbdirexists = 1;
+                    }
+                    if (Lights[i].type == 0) {
+                        glbambexists = 1;
+                    }
                 }
+                Lights[i].brightness = NuFileReadInt(fh);
             }
-            NuFileClose(handle);
+            NuFileClose(fh);
+            if (glbdirexists == 0 && glbambexists == 0) {
+            }
         }
     }
-    return;
 }
 
 //NGC MATCH

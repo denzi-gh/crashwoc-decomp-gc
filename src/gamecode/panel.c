@@ -3,6 +3,13 @@
 #include <string.h>
 #define LANGUAGE_JAPANESE 0x63
 
+s32 Draw3DObject(s32 object, struct nuvec_s* pos, u16 xrot, u16 yrot, u16 zrot,
+                 float scalex, float scaley, float scalez, struct nugscn_s* scn,
+                 struct nuspecial_s* obj, s32 rot);
+void MakeTimeI(int time, int hours, char* txt);
+void NuHGobjEvalAnim(struct NUHGOBJ_s* hgobj, struct nuanimdata_s* animdata, float time,
+                     s32 njanims, struct NUJOINTANIM_s* janim, struct numtx_s* mtx_array);
+
 /* ---- Struct definitions ---- */
 
 struct objtab_s {
@@ -18,22 +25,18 @@ struct objtab_s {
 };
 
 struct plritem_s {
-    s32 draw;
-    s32 count;
-    s32 frame;
-    s32 wait;
-    s32 delay;
+    s16 count;
+    s16 draw;
+    s8 frame;
+    s8 wait;
+    u8 delay;
+    u8 item;
 };
 
 struct plrbonus_s {
     u32 item;
     s32 count;
     s32 frame;
-};
-
-struct pdeb_vec2_s {
-    float x;
-    float y;
 };
 
 struct pdebnfo_s {
@@ -43,21 +46,21 @@ struct pdebnfo_s {
 };
 
 struct pdeb_s {
-    s8 active;
-    s8 type;
-    short i_objtab;
+    struct pdebnfo_s* info;
+    struct nuvec_s oldpos;
+    struct nuvec_s pos;
+    struct nuvec_s mom;
+    float time;
+    float oldscale;
+    float scale;
     u16 xrot;
     u16 yrot;
     u16 zrot;
+    short i_objtab;
+    s8 type;
+    s8 active;
     char pad1;
     char pad2;
-    struct pdebnfo_s* info;
-    struct pdeb_vec2_s pos;
-    struct pdeb_vec2_s oldpos;
-    struct pdeb_vec2_s mom;
-    float oldscale;
-    float scale;
-    float time;
 };
 
 typedef struct crate_s CRATE;
@@ -857,8 +860,8 @@ void UpdatePanelDebris(void) {
     float xs[2];
     float ys;
     float scale;
-    float f;
     float old_time;
+    float f;
     s32 i;
 
     deb = PDeb;
@@ -2003,7 +2006,7 @@ s32 DrawPanel3DTempCharacter(float x, float y, float z, float scale, u16 xrot, u
     struct nuvec_s s;
     struct numtx_s *cammtx;
     struct CharacterModel* model;
-    float *dwa[7];
+    float **dwa;
     
     if ((temp_character != 2) && (temp_character != 0x62) && (temp_character != 0xb8) &&
         (temp_character != 0xb9) && (temp_character != 0xba) && (temp_character != 0xbc) ||
@@ -2044,7 +2047,7 @@ s32 DrawPanel3DTempCharacter(float x, float y, float z, float scale, u16 xrot, u
     cammtx = NuCameraGetMtx();
     NuMtxMul(&m, &m, cammtx);
     EvalModelAnim(model, &TempAnim, &m, tmtx, &dwa, NULL);
-    return NuHGobjRndrMtxDwa(model->hobj, &m, 1, NULL, tmtx, *dwa);
+    return NuHGobjRndrMtxDwa(model->hobj, &m, 1, NULL, tmtx, dwa);
 }
 
 //NGC MATCH
@@ -2054,7 +2057,6 @@ s32 DrawPanel3DObject(s32 object,float x,float y,float z,float scalex,float scal
     struct nuvec_s s;
     s32 i;
     struct numtx_s *cammtx;
-    char pad [17];
     
 
     if (((scn != NULL) && (obj != NULL)) &&
@@ -2111,7 +2113,6 @@ s32 DrawPanel3DCharacter(s32 character,float x,float y,float z,float scalex,floa
     struct CharacterModel *model;
     struct numtx_s m;
     struct nuvec_s s;
-    char pad[25];
     
 
     if ((((scalex == 0.0f) && (scaley == 0.0f)) && (scalez == 0.0f)) ||

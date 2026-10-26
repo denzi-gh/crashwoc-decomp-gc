@@ -870,6 +870,16 @@ void SetLevel(void) {
   return;
 }
 
+void Reseter(s32);
+s32 CopyFilesThreadProc(s32 a);
+s32 NuTexCreate(struct nutex_s* tex);
+s32 NuRndrBeginScene(s32 hRT);
+void NuRndrClear(s32 flags, s32 colour, float depth);
+void NuRndrEndScene();
+void NuRndrRectUV2di(s32 x,s32 y,s32 w,s32 h,float tx,float ty,float tw,float th,s32 col,struct numtl_s *mtl);
+void NuRndrSwapScreen(s32 hRT);
+void firstscreenfade(struct numtl_s* mat, s32 dir);
+
 //NGC MATCH
 void firstscreenfade(struct numtl_s *mat,s32 dir) {
     s32 s;
@@ -899,7 +909,7 @@ void firstscreenfade(struct numtl_s *mat,s32 dir) {
 }
 
 //NGC MATCH
-s32 CopyFilesThreadProc() {
+s32 CopyFilesThreadProc(s32 a) {
     s32 iVar1;
     char texBuf [128];
     u32 iStack_c;
@@ -1016,8 +1026,11 @@ void firstscreens() {
     char * gerbils;
     struct numtl_s * firstscreen1_mtl;
     s32 firstscreen1_tid;
+    s32 temp;
 
-    firstscreen1_mtl = NULL;  
+    temp = 0;
+
+    firstscreen1_mtl = NULL;
     CopyFilesThreadProc(0);
     gerbils = (char*)malloc_x(0x4000c);
     NuFileLoadBuffer("gfx\\licnin.s3",gerbils,0x2000c);
@@ -1153,8 +1166,254 @@ void firstscreens() {
 }
 
 
-//92.85% NGC (86% PS2)
+void CalculateGamePercentage(struct game_s *game);
+void CreateFadeMtl();
+void Reseter(s32);
+//void DBTimerStart(s32 index);
+//void DEMOInit(struct _GXRenderModeObj* mode);
+void DebrisMalloc();
+//void AddBugLight();
+void DebrisRegisterCutoffCameraVec(struct nuvec_s* cutoff);
+s32 NuRndrBeginScene(s32 hRT);
+void GameMusic(s32 sfx, s32 i);
+void GameSfx(s32 sfx, struct nuvec_s* pos);
+s32 HubFromLevel(s32 level);
+void InitCameraTargetMaterial();
+void InitCrateExplosions();
+void InitCutScenes();
+void InitDeb3();
+void InitGameMode(s32 mode);
+void InitPadPlayRecord(char* name, s32 mode, s32 size, void* buff);
+void InitPauseRender();
+void InitPlayerEvents();
+void InstInit();
+void LoadLevel();
+void MC_Init();
+void NewCut(s32 i);
+void NewGame();
+void NewMenu(struct cursor_s* cur, s32 menu, s32 y, s32 level);
+struct nucamera_s* NuCameraCreate();
+void NuFileInitEx(s32 deviceid, s32 rebootiop);
+s32 NuGetFrameAdvance();
+void NuGobjInit();
+void NuInitFrameAdvance();
+void NuLgtSetArcMat(struct numtl_s* mtl, float u0, float v0, float u1, float v1);
+void NuLightInit();
+void NuMtlInit();
+void NuPs2Init();
+struct nupad_s* NuPs2OpenPad(s32 port, s32 slot);
+void NuPs2PadSetMotors(struct nupad_s* pad, s32 motor1, s32 motor2);
+void NuRandSeed(u32 seed);
+void NuRndrInitEx(s32 streambuffersize);
+void NuSoundKillAllAudio();
+void NuSoundSetLevelAmbience();
+void NuSoundUpdate();
+void NuTexInit();
+void NuTrigInit();
+void NuVpInit();
+//void PlayCutMovie(s32 movie);
+void Reset3DFontObjects();
+void ResetAI();                                        /* extern */
+void ResetAwards();                                    /* extern */
+void ResetBonus();                                     /* extern */
+void ResetBug();                                       /* extern */
+void ResetChases();                                    /* extern */
+void ResetCrates();                                    /* extern */
+void ResetDeath();                                     /* extern */
+void ResetGame();                                      /* extern */
+void ResetGameCameras(struct cammtx_s *Gamecam,s32 n);
+void ResetGameSfx();                                   /* extern */
+void ResetGates();                                     /* extern */
+void ResetGemPath();                                   /* extern */
+void ResetLevel();                                     /* extern */
+void ResetMaskFeathers();                              /* extern */
+void ResetPanelDebris();                               /* extern */
+void ResetPlayerEvents();                              /* extern */
+void ResetProjectiles();                               /* extern */
+void ResetRings();                                     /* extern */
+void ResetSuperBuffer();                               /* extern */
+void ResetTempCharacter(s32 character, s32 action);
+void ResetTimeTrial();                                 /* extern */
+void ResetTimer(struct GTimer* t);
+void ResetVehicleControl(s32 iRAIL, s32 iALONG, float fALONG);
+void ResetWumpa();
+void SS_Init();
+void SetLevel();
+void VehicleSetup();
+void __main (s32 argc, char * * argv, char * * envp);
+void srand (u32 __seed);
+void ProcessGlass(s32 paused);
+void RotateDirectionalLight(struct nuvec_s* v, s32 xrot, s32 yrot);
+void TBCODEEND(s32 i);
+void TBCODESTART(s32 i, char* txt);
+void tbslotEnd(s32 tbh, s32 slotix);
+void edobjUpdateObjects(float dt);
+void NuGScnUpdate(struct nugscn_s * scn, float dt);
+void UpdateBugLight(struct creature_s* c);
+void ProcessVehicleLevel(struct nupad_s* Pad);
+void edanimUpdateObjects(float dt);
+//void Debris(s32 pause);
+s32 DebrisCollisionCheck(struct nuvec_s* centre, float radius);
+void UpdatePlayerStats(struct creature_s* plr);
+void NuLightFog(float pnear, float pfar, u32 colour, s32 blur, s32 haze);
+void ProcMenu(struct cursor_s *cursor,struct nupad_s *pad);
+s32 KillPlayer(struct obj_s * player_obj, s32 die);
+void NuMtlAnimate(float timestep);
+void TBDRAWSTART(s32 i, char* txt);
+void TBDRAWEND(s32 i);
+void NuRndrClear(s32 flags, s32 colour, float depth);
+void DrawCreatures(struct creature_s* c, s32 count, s32 render, s32 shadow);
+void DrawChases(s32 render);
+void DrawNextVehicle(s32 render);
+void DrawTempCharacter(s32 render);
+void DrawTempCharacter2(s32 render);
+void NuWaterSpeed(float speed);
+void ApplyVisiTable(struct nugscn_s* sc, struct nuvec_s* pos);
+void visiSetSplineKnot(struct visidata_s* vd, s32 spix, s32 knotix);
+void DrawMask(struct mask * mask);
+void DrawMaskFeathers();
+void MoveGameCamera(struct cammtx_s * GameCamera, struct obj_s * obj);
+void firstscreens();
+void NuBridgeUpdate(struct nuvec_s* playerpos);
+void NuWindUpdate(struct nuvec_s* pos);
+void NuRndrWaterRippleUpdate(s32 count);
+void NuRndrWaterRip(struct numtl_s* mtl);
+void NuRndrShadPolys(struct numtl_s* mtl);
+void NuRndrFootPrints(struct numtl_s* mtl, float* u, float* v);
+void NuRndrFx(s32 paused, struct nuvec_s* playerpos);
+void HandlePauseRender(s32 pause_count);
+void DoClouds(s32 paused);
+void NuRndrRect2di(s32 x, s32 y, s32 w, s32 h, s32 col, struct numtl_s * mtl);
+void NuRndrSwapScreen(s32 hRT);
+void PauseGameAudio(s32 music);
+s32 NuSoundStopStream(s32 SPUChannel);
+void CloseCutMovie(s32 all);
+void GetSpaceCut(s32 last, s32 next);
+void NuSceneDestroy(struct nuscene_s* sc);
+s32 tbsetCreate(s32* cols);
+void tbslotBegin(s32 tbh, s32 slotix);
+
+struct plritem_s {
+    short count;
+    short draw;
+    s8 frame;
+    s8 wait;
+    u8 delay;
+    u8 item;
+};
+
+struct _XINPUT_STATE* PadData;
+s32 DRAWCREATUREHACK;
+s32 DRAWDEBRISHACK;
+s32 FixFrameRate;
+s32 ForcePlayRecord;
+float foot_v[32];
+float foot_u[32];
+s32 force_menu;
+s32 frameout;
+long frameout_count;
+s32 just_continued;
+static s32 number_of_times_played;
+float AtmosphericPressureHackedZ;
+float snowflake_scale;
+static s32 level_clearcolour;
+static s32 level_fogcolour;
+s32 GLASSPLAYER;
+s32 BLUR;
+s32 NODEBRIS;
+s32 mg_wumpatot;
+s32 VEHICLECONTROL;
+u32 pausestats_frame;
+s32 pad_play;
+s32 pad_record;
+s32 DRAWWORLDHACK;
+s32 screendump;
+s32 save_paused;
+extern struct nugspline_s* pVIS;
+extern s32 iVIS;
+extern s32 advice_wait;
+extern s32 last_character;
+extern s32 last_used_character;
+extern s32 last_hub;
+extern s32 Bonus;
+extern struct cammtx_s GameCam[1];
+extern struct cursor_s Cursor;
+extern struct GTimer CutTimer;
+extern s32 force_glass_screencopy_enable;
+extern s32 FRAMES;
+extern void* GS_FrameBufferCopydataptr;
+extern struct game_s Game;
+extern s32 GameMode;
+extern s32 Hub;
+extern struct ldata_s* LDATA;
+extern s32 Level;
+extern s32 LostLife;
+extern s32 MAXVPSIZEX;
+extern s32 MAXVPSIZEY;
+extern s32 MINVPSIZEX;
+extern s32 MINVPSIZEY;
+extern unsigned long long LBIT;
+extern s32 logos_played;
+extern float musicvol_mul;
+extern s32 new_mode;
+extern float plr_invisibility_time;
+extern struct cammtx_s* pCam;
+extern s32 new_level;
+extern s32 plr_died;
+extern struct RPos_s* best_cRPos;
+extern s32 font3d_initialised;
+extern s32 cortex_gameover_i;
+extern float cufps;
+extern s32 GS_Parallax;
+extern float POWERTEXTY;
+extern struct rail_s Rail[8];
+extern s32 cutmovie;
+extern s32 cut_on;
+extern s32 game_music;
+extern struct creature_s OppTubCreature;
+extern s32 gamesfx_channel;
+extern struct nucamera_s global_camera;
+extern s32 highallocaddr;
+extern s32 in_finish_range;
+extern s32 last_level;
+extern struct GTimer GameTimer;
+extern s32 PLAYERCOUNT;
+extern struct GTimer GlobalTimer;
+extern struct plritem_s plr_bonus_wumpas;
+extern s32 mask_crates;
+extern struct nuvec_s ldir[3];
+extern struct creature_s Character[9];
+extern s32 crate_wumpa;
+extern struct plritem_s plr_wumpas;
+extern s32 nuvideo_global_vbcnt;
+extern struct nucamera_s* pNuCam;
+extern s32 pause_dir;
+extern s32 qseed;
+extern s32 tempanim_nextaction;
+extern s32 tempanim_waitaudio;
+extern float vtog_duration;
+extern float vtog_time;
+
 /*
+    // Local variables
+    int room_ambience_update_count; // r18
+    float f; // f0
+    struct creature_s * plr; // r30
+    int i; // r29
+    int temp; // r9
+    int temp_paused; // r31
+    int ok; // r26
+    int retro; // r23
+    int old_paused;
+    int gametimer;
+    int y0; // r11
+    int y1; // r6
+    struct nuvec_s pos; // r1+0x8
+    int just_been_paused; // r22
+    int reset; // r1+0xA0
+*/
+
+//92.85% NGC (86% PS2)
 int main(s32 argc,char **argv) {
   //s32 bVar1;
   //s32 bVar2;
@@ -1886,4 +2145,3 @@ LAB_80051ba4:
   number_of_times_played++;
   goto LAB_80051ba4;
 }
-*/
