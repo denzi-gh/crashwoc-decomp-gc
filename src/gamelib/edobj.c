@@ -21,6 +21,8 @@ void PlatInstRotate(s32 platid, s32 state);
 void PlatInstBounce(s32 platid, float plrgrav, float tension, float damp);
 void edobjSoundDestroy(s32 obj, s32 sound);
 void edobjParticleDestroy(s32 obj, s32 ptl);
+void NuAnimDataCalcTime(struct nuanimdata_s *animdata, float time, struct nuanimtime_s *atime);
+void NuAnimCurveSetApplyToMatrix(struct nuanimcurveset_s *animcurveset, struct nuanimtime_s *atime, struct numtx_s *T);
 
 //NGC MATCH
 float edobjPlayerObjectDistance(s32 objid) {
@@ -32,342 +34,289 @@ float edobjPlayerObjectDistance(s32 objid) {
   }
 }
 
-void edobjUpdateObjects(float frametime) {
-    static float localframecount;
-    struct nuvec_s norm;
-    struct nuanimtime_s atime;
-    struct numtx_s animtx;
-    struct numtx_s emitrotmtx;
-    struct numtx_s rotmtx;
-    s32 platinfo;
-    s32 platextra;
-    s32 platid;
-    struct nuvec_s *pnorm;
+static f32 localframecount_156_N1;
+
+//NGC MATCH
+void edobjUpdateObjects(float dt) {
     s32 i;
     s32 j;
     s32 k;
-    struct nuinstance_s *instance;
-    struct nuinstanim_s *instanim;
-    struct nuanimdata_s *animdata;
+    struct nuinstance_s* instance;
+    struct nuvec_s norm;
+    s32 info;
+    s32 extra;
+    s32 impactid;
     float ltime;
-    float totaltime;
-    s32 pathoffset;
+    struct nuinstanim_s* instanim;
+    s32 sid;
 
-    platid = PlatImpactInfo(&norm, &platinfo, &platextra);
-    pnorm = &norm;
-
-    for (i = 0; i < 64; i++) {
+    impactid = PlatImpactInfo(&norm, &info, &extra);
+    for (i = 0; i < 0x40; i++) {
+        ltime = 1.0f;
         instance = &ObjectInstance[i];
-        ltime = 0.0f;
+        if (instance->objid != -1) {
+            instanim = instance->anim;
+            NuMtxSetIdentity(&instance->mtx);
+            instance->mtx._30 = ObjectPath[i].waypoint[0].x;
+            instance->mtx._31 = ObjectPath[i].waypoint[0].y;
+            instance->mtx._32 = ObjectPath[i].waypoint[0].z;
+            if ((instanim != 0) && (ObjectAnim[instanim->anim_ix] != 0)) {
+                switch (ObjectPath[i].trigger_type) {
+                    case 0:
+                        instanim->playing = 1;
+                        break;
 
-        if (instance->objid == -1) goto next_object;
+                    case 1:
+                        instanim->playing = 0;
+                        if ((ObjectPath[i].trigger_id != -1) && (object_switches[ObjectPath[i].trigger_id] != 0)) {
+                            instanim->playing = 1;
+                        }
+                        break;
+                        ltime = dt;
 
-        instanim = instance->anim;
-        NuMtxSetIdentity(&instance->mtx);
-        totaltime = frametime;
-
-        pathoffset = i * sizeof(struct object_path_s);
-
-        instance->mtx._30 = ObjectPath[i].waypoint[0].x;
-        instance->mtx._31 = ObjectPath[i].waypoint[0].y;
-        instance->mtx._32 = ObjectPath[i].waypoint[0].z;
-
-        if (instanim == NULL) goto skip_anim;
-        if (ObjectAnim[instanim->anim_ix] == NULL) goto skip_anim;
-
-        /* trigger type switch */
-        switch (ObjectPath[i].trigger_type) {
-        case 0:
-            instanim->ipad[0] = instanim->ipad[0] | 0x80000000;
-            break;
-        case 1:
-            instanim->ipad[0] = instanim->ipad[0] & 0x7FFFFFFF;
-            if (ObjectPath[i].trigger_id == -1) goto trigger_done;
-            if (object_switches[ObjectPath[i].trigger_id] == 0) goto trigger_done;
-            instanim->ipad[0] = instanim->ipad[0] | 0x80000000;
-            break;
-        case 2:
-            instanim->ipad[0] = instanim->ipad[0] & ~0x10000000;
-            if (ObjectPath[i].trigger_id == -1) goto trigger_done;
-            if (object_switches[ObjectPath[i].trigger_id] == 0) goto trigger_done;
-            if (instanim->ipad[0] < 0) goto trigger_done;
-            instanim->ipad[0] = instanim->ipad[0] | 0x80000000;
-            instanim->ltime = 0.0f;
-            instanim->ipad[0] = instanim->ipad[0] & ~0x40000000;
-            break;
-        case 3:
-            instanim->ipad[0] = instanim->ipad[0] | 0x10000000;
-            if (ObjectPath[i].trigger_id == -1) goto trigger_done;
-            if (object_switches[ObjectPath[i].trigger_id] == 0) goto trigger_done;
-            instanim->ipad[0] = instanim->ipad[0] | 0x90000000;
-            break;
-        case 4:
-            if (edobjPlayerObjectDistance(i) < ObjectPath[i].trigger_var) {
-                instanim->ipad[0] = instanim->ipad[0] | 0x80000000;
-            } else {
-                instanim->ipad[0] = instanim->ipad[0] & 0x7FFFFFFF;
-            }
-            break;
-        case 5:
-            instanim->ipad[0] = instanim->ipad[0] & ~0x10000000;
-            if (edobjPlayerObjectDistance(i) < ObjectPath[i].trigger_var) {
-                if (instanim->ipad[0] < 0) goto trigger_done;
-                instanim->ipad[0] = instanim->ipad[0] | 0x80000000;
-                instanim->ltime = 0.0f;
-                instanim->ipad[0] = instanim->ipad[0] & ~0x40000000;
-            }
-            break;
-        case 6:
-            instanim->ipad[0] = instanim->ipad[0] | 0x10000000;
-            if (edobjPlayerObjectDistance(i) < ObjectPath[i].trigger_var) {
-                instanim->ipad[0] = instanim->ipad[0] | 0x80000000;
-            }
-            break;
-        case 7:
-            if (ObjectPath[i].terrplatid == platid) {
-                ObjectPath[i].trigger_var = 10.0f;
-            }
-            if (ObjectPath[i].trigger_var > 0.0f) {
-                ObjectPath[i].trigger_var -= frametime;
-                instanim->ipad[0] = instanim->ipad[0] | 0x80000000;
-            } else {
-                instanim->ipad[0] = instanim->ipad[0] & 0x7FFFFFFF;
-            }
-            break;
-        case 8:
-            instanim->ipad[0] = instanim->ipad[0] & ~0x10000000;
-            if (ObjectPath[i].terrplatid == platid) {
-                if (instanim->ipad[0] < 0) goto trigger_done;
-                instanim->ipad[0] = instanim->ipad[0] | 0x80000000;
-                instanim->ltime = 0.0f;
-                instanim->ipad[0] = instanim->ipad[0] & ~0x20000000;
-                if (ObjectPath[i].trigger_wait > 0.0f) {
-                    instanim->tfirst = ObjectPath[i].trigger_wait + ltime;
-                    instanim->ipad[0] = instanim->ipad[0] | 0x20000000;
-                }
-                instanim->ipad[0] = instanim->ipad[0] & ~0x40000000;
-            }
-            break;
-        case 9:
-            instanim->ipad[0] = instanim->ipad[0] | 0x10000000;
-            if (ObjectPath[i].terrplatid == platid) {
-                instanim->ipad[0] = instanim->ipad[0] | 0x90000000;
-            }
-            break;
-        }
-trigger_done:
-        /* animation playback */
-        animdata = ObjectAnim[instanim->anim_ix];
-        if (animdata == NULL || instanim->ipad[0] >= 0) goto get_ltime;
-
-        instanim->ltime = instanim->ltime + frametime * instanim->tfactor;
-
-        if (instanim->ipad[0] & 0x20000000) {
-            if (instanim->ltime >= instanim->tfirst) {
-                instanim->tfirst -= 1.0f;
-                instanim->ltime -= instanim->tfirst;
-                instanim->ipad[0] = instanim->ipad[0] & ~0x20000000;
-            }
-            if (instanim->ipad[0] & 0x20000000) goto anim_calc;
-        }
-
-        if (instanim->ltime >= animdata->time + instanim->tinterval) {
-            if (instanim->ipad[0] & 0x10000000) {
-                if (instanim->ipad[0] & 0x08000000) {
-                    if (instanim->ipad[0] & 0x40000000) {
-                        instanim->ipad[0] = (instanim->ipad[0] & ~0x40000000) | ((!(instanim->ipad[0] & 0x40000000)) << 30);
+                    case 2: {
+                        instanim->repeating = 0;
+                        if (((ObjectPath[i].trigger_id != -1) && (object_switches[ObjectPath[i].trigger_id] != 0))
+                            && (instanim->playing == 0))
+                        {
+                            instanim->ltime = 1.0f;
+                            instanim->playing = 1;
+                            instanim->backwards = 0;
+                            instanim->waiting = 0;
+                        }
+                        break;
                     }
-                    instanim->ltime = 1.0f;
-                } else {
-                    /* check non-oscillate, non-repeat end */
-                    instanim->ipad[0] = instanim->ipad[0] & 0x7FFFFFFF;
-                    if (ObjectPath[i].trigger_id != -1) {
-                        object_switches[ObjectPath[i].trigger_id] = 0;
+
+                    case 3:
+                        instanim->repeating = 1;
+                        if ((ObjectPath[i].trigger_id != -1) && (object_switches[ObjectPath[i].trigger_id] != 0)) {
+                            instanim->playing = 1;
+                        }
+                        break;
+
+                    case 4:
+                        if (edobjPlayerObjectDistance(i) < ObjectPath[i].trigger_var) {
+                            instanim->playing = 1;
+                        } else {
+                            instanim->playing = 0;
+                        }
+                        break;
+
+                    case 5: {
+                        instanim->repeating = 0;
+                        if ((edobjPlayerObjectDistance(i) < ObjectPath[i].trigger_var)
+                            && (instanim->playing == 0))
+                        {
+                            instanim->ltime = 1.0f;
+                            instanim->playing = 1;
+                            instanim->backwards = 0;
+                            instanim->waiting = 0;
+                        }
+                        break;
                     }
-                }
-            } else {
-                /* auto-repeat with osc */
-                if ((instanim->ipad[0] & 0x48000000) == 0x08000000) {
-                    instanim->ltime = 1.0f;
-                    instanim->ipad[0] = (instanim->ipad[0] & ~0x40000000) | ((!(instanim->ipad[0] & 0x40000000)) << 30);
-                }
-            }
-        }
 
-anim_calc:
-        ltime = instanim->ltime;
-        if (ltime > animdata->time) {
-            ltime = animdata->time;
-        }
-get_ltime:
-        if (instanim == NULL) ltime = instanim->ltime;
+                    case 6:
+                        instanim->repeating = 1;
+                        if (edobjPlayerObjectDistance(i) < ObjectPath[i].trigger_var) {
+                            instanim->playing = 1;
+                        }
+                        break;
 
-        if (instanim->ipad[0] & 0x40000000) {
-            ltime = animdata->time + 1.0f - ltime;
-        }
+                    case 7:
+                        if (ObjectPath[i].terrplatid == impactid) {
+                            ObjectPath[i].trigger_var = 10.0f;
+                        }
+                        if (ObjectPath[i].trigger_var > 0.0f) {
+                            ObjectPath[i].trigger_var -= dt;
+                            instanim->playing = 1;
+                        } else {
+                            instanim->playing = 0;
+                        }
+                        break;
 
-        NuAnimDataCalcTime(animdata, ltime, &atime);
-        totaltime = frametime;
-        NuAnimCurveSetApplyToMatrix(*animdata->chunks[atime.chunk]->animcurvesets, &atime, &animtx);
-
-        /* copy matrix */
-        {
-            struct numtx_s *src = &animtx;
-            struct numtx_s *dst = (struct numtx_s *)instanim;
-            struct nuvec_s *pos = (struct nuvec_s *)&instance->mtx._30;
-            s32 cnt = 0x30;
-            do {
-                cnt -= 0x18;
-                ((u32 *)dst)[0] = ((u32 *)src)[0];
-                ((u32 *)dst)[1] = ((u32 *)src)[1];
-                ((u32 *)dst)[2] = ((u32 *)src)[2];
-                ((u32 *)dst)[3] = ((u32 *)src)[3];
-                ((u32 *)dst)[4] = ((u32 *)src)[4];
-                ((u32 *)dst)[5] = ((u32 *)src)[5];
-                src = (struct numtx_s *)((char *)src + 0x18);
-                dst = (struct numtx_s *)((char *)dst + 0x18);
-            } while (cnt != 0);
-            ((u32 *)dst)[0] = ((u32 *)src)[0];
-            ((u32 *)dst)[1] = ((u32 *)src)[1];
-            ((u32 *)dst)[2] = ((u32 *)src)[2];
-            ((u32 *)dst)[3] = ((u32 *)src)[3];
-        }
-        NuMtxTranslate((struct Mtx *)instanim, (struct nuvec_s *)&instance->mtx._30);
-
-skip_anim:
-        /* particle loop */
-        for (j = (s32)totaltime, k = 0; k < ObjectPath[i].usedpart; k++) {
-            if (ObjectPath[i].particle_type[k] == -1) {
-                /* particle_name lookup */
-                if (ObjectPath[i].particle_name[k][0] != 0) {
-                    ObjectPath[i].particle_type[k] = LookupDebrisEffect(ObjectPath[i].particle_name[k]);
-                    if (ObjectPath[i].particle_type[k] == -1) {
-                        edobjParticleDestroy(i, k);
-                        k--;
-                        continue;
+                    case 8: {
+                        instanim->repeating = 0;
+                        if ((ObjectPath[i].terrplatid == impactid) && (instanim->playing == 0)) {
+                            instanim->playing = 1;
+                            instanim->ltime = ltime;
+                            instanim->waiting = 0;
+                            if (ObjectPath[i].trigger_wait > 0.0f) {
+                                instanim->tfirst = ObjectPath[i].trigger_wait + ltime;
+                                instanim->waiting = 1;
+                            }
+                            instanim->backwards = 0;
+                        }
+                        break;
                     }
-                }
-            } else {
-                /* check if particle_switch enabled */
-                if (ObjectPath[i].particle_switch[k] != 0) {
-                    if (instanim == NULL) goto particle_next;
-                    if (instanim->ipad[0] >= 0) goto particle_next;
-                    if (instanim->ltime >= ObjectAnim[instanim->anim_ix]->time) goto particle_next;
+
+                    case 9:
+                        instanim->repeating = 1;
+                        if (ObjectPath[i].terrplatid == impactid) {
+                            instanim->playing = 1;
+                        }
+                        break;
                 }
 
                 {
-                    struct nuinstanim_s *mtxsrc;
+                    struct nuanimdata_s* animdata;
 
-                    if (instanim != NULL) {
-                        mtxsrc = instanim;
-                    } else {
-                        mtxsrc = (struct nuinstanim_s *)instance;
-                    }
-
-                    if ((edobj_particle_mode != 0 || edobj_sound_mode != 0) && edobj_nearest == i) {
-                        mtxsrc = (struct nuinstanim_s *)instance;
-                    }
-
-                    NuVecMtxTransform(&norm, &ObjectPath[i].particle_offset[k], (struct Mtx *)mtxsrc);
-
-                    emitrotmtx = numtx_identity;
-
-                    NuMtxRotateZ((struct Mtx *)&emitrotmtx, (s32)ObjectPath[i].particle_emitrotz[k]);
-                    NuMtxRotateY((struct Mtx *)&emitrotmtx, (s32)ObjectPath[i].particle_emitroty[k]);
-                    NuMtxMul((struct Mtx *)&rotmtx, (struct Mtx *)&emitrotmtx, (struct Mtx *)mtxsrc);
-
-                    if (ObjectPath[i].particle_rate[k] > 0) {
-                        AddVariableShotDebrisEffectMtx2(ObjectPath[i].particle_type[k], &norm, ObjectPath[i].particle_rate[k], &rotmtx, (struct numtx_s *)&numtx_identity);
-                    } else if (ObjectPath[i].particle_rate[k] < 0) {
-                        s32 rate = ObjectPath[i].particle_rate[k];
-                        s32 absrate;
-                        s32 rem;
-                        s32 frame;
-                        s32 prevframe;
-
-                        absrate = rate < 0 ? -rate : rate;
-                        frame = (s32)(localframecount + frametime);
-                        prevframe = (s32)localframecount;
-                        frame = frame / absrate;
-                        prevframe = prevframe / absrate;
-                        if (frame != prevframe) {
-                            AddVariableShotDebrisEffectMtx2(ObjectPath[i].particle_type[k], &norm, 1, &rotmtx, (struct numtx_s *)&numtx_identity);
-                        }
-                    }
-                }
-            }
-particle_next:
-            ;
-        }
-
-        /* sound loop */
-        for (j = 0; j < ObjectPath[i].usedsound; j++) {
-            if (ObjectPath[i].sound_id[j] == -1) {
-                if (ObjectPath[i].sound_name[j][0] != 0) {
-                    ObjectPath[i].sound_id[j] = edbitsLookupSoundFX(ObjectPath[i].sound_name[j]);
-                    if (ObjectPath[i].sound_id[j] == -1) {
-                        edobjSoundDestroy(i, j);
-                        j--;
-                        continue;
-                    }
-                }
-            } else {
-                s32 sound_play = -1;
-
-                if (ObjectPath[i].sound_type[j] == 1) {
-                    s32 frame_next = (s32)(localframecount + frametime);
-                    s32 period = (s32)ObjectPath[i].sound_time[j];
-                    s32 frame_cur = (s32)localframecount;
-                    if (frame_next / period > frame_cur / period) {
-                        sound_play = ObjectPath[i].sound_id[j];
-                    }
-                } else {
-                    if (ltime >= ObjectPath[i].sound_time[j]) {
-                        if (!(ltime > ObjectPath[i].sound_last_time)) goto sound_check_repeat;
-                        sound_play = ObjectPath[i].sound_id[j];
-                    }
-sound_check_repeat:
-                    if (ObjectPath[i].oscillate != 0) {
-                        float prevtime = ObjectPath[i].sound_last_time + 0.0f;  // just load
-                        if (ltime <= prevtime) {
-                            float abstime;
-                            abstime = (float)((s32)ObjectPath[i].sound_last_time < 0 ? -(s32)ObjectPath[i].sound_last_time : (s32)ObjectPath[i].sound_last_time);
-                            if (prevtime < abstime) {
-                                sound_play = ObjectPath[i].sound_id[j + 0]; // ???
+                    animdata = ObjectAnim[instanim->anim_ix];
+                    if ((animdata != 0) && (instanim->playing != 0)) {
+                        instanim->ltime += (dt * instanim->tfactor);
+                        if (instanim->waiting != 0) {
+                            if (instanim->ltime >= instanim->tfirst) {
+                                instanim->waiting = 0;
+                                instanim->ltime -= (instanim->tfirst - 1.0f);
                             }
                         }
-                    }
-                }
-
-                if (sound_play != -1) {
-                    struct nuinstanim_s *mtxsrc;
-
-                    if (instanim != NULL) {
-                        mtxsrc = instanim;
+                        if (instanim->waiting == 0) {
+                            if (instanim->ltime >= (animdata->time + instanim->tinterval)) {
+                                if (instanim->repeating != 0) {
+                                    if (instanim->oscillate != 0) {
+                                        instanim->backwards = (instanim->backwards == 0) ? 1 : 0;
+                                    }
+                                    instanim->ltime = 1.0f;
+                                } else if ((instanim->backwards != 0) || (instanim->oscillate == 0)) {
+                                    instanim->playing = 0;
+                                    if (ObjectPath[i].trigger_id != -1) {
+                                        object_switches[ObjectPath[i].trigger_id] = 0;
+                                    }
+                                } else {
+                                    instanim->ltime = 1.0f;
+                                    instanim->backwards = (instanim->backwards == 0) ? 1 : 0;
+                                }
+                            }
+                            if (instanim->ltime > animdata->time) {
+                                ltime = animdata->time;
+                            } else {
+                                ltime = instanim->ltime;
+                            }
+                        }
                     } else {
-                        mtxsrc = (struct nuinstanim_s *)instance;
+                        ltime = instanim->ltime;
+                    }
+                    if (instanim->backwards != 0) {
+                        ltime = (animdata->time + 1.0f) - ltime;
                     }
 
-                    if ((edobj_particle_mode != 0 || edobj_sound_mode != 0) && edobj_nearest == i) {
-                        mtxsrc = (struct nuinstanim_s *)instance;
+                    {
+                        struct nuanimtime_s atime;
+                        struct numtx_s animtx;
+                        NuAnimDataCalcTime(animdata, ltime, &atime);
+                        NuAnimCurveSetApplyToMatrix(*animdata->chunks[atime.chunk]->animcurvesets, &atime, &animtx);
+                        instanim->mtx = animtx;
+                        NuMtxTranslate(&instanim->mtx, (struct nuvec_s*)(&instance->mtx._30));
                     }
-
-                    NuVecMtxTransform(&norm, &ObjectPath[i].sound_offset[j], (struct Mtx *)mtxsrc);
-                    edbitsSoundPlay(&norm, sound_play);
                 }
             }
-        }
+                for (j = 0; j < ((s32)dt); j++) {
+                    k = 0;
+                    while (k < ObjectPath[i].usedpart) {
+                        if (ObjectPath[i].particle_type[k] != -1) {
+                            if ((ObjectPath[i].particle_switch[k] == 0)
+                                || (((instanim != 0) && (instanim->playing != 0))
+                                    && !(instanim->ltime >= ObjectAnim[instanim->anim_ix]->time)))
+                            {
+                                struct numtx_s* whichmtx;
+                                struct nuvec_s emit;
+                                struct numtx_s tmtx;
+                                struct numtx_s orient;
+                                s32 absrate;
+                                s32 frame;
 
-        if (ObjectPath[i].oscillate != 0) {
-            ObjectPath[i].sound_last_time = -ltime;
-        } else {
-            ObjectPath[i].sound_last_time = ltime;
-        }
+                                if (instanim != 0) {
+                                    whichmtx = (struct numtx_s*)instanim;
+                                } else {
+                                   whichmtx = (struct numtx_s*)instance;
+                                }
+                                if (((edobj_particle_mode != 0) || (edobj_sound_mode != 0)) && (edobj_nearest == i)) {
+                                    whichmtx = (struct numtx_s*)instance;
+                                }
+                                NuVecMtxTransform(&emit, &ObjectPath[i].particle_offset[k], whichmtx);
+                                orient = numtx_identity;
+                                NuMtxRotateZ(&orient, ObjectPath[i].particle_emitrotz[k]);
+                                NuMtxRotateY(&orient, ObjectPath[i].particle_emitroty[k]);
+                                NuMtxMul(&tmtx, &orient, whichmtx);
+                                if (ObjectPath[i].particle_rate[k] > 0) {
+                                    AddVariableShotDebrisEffectMtx2(
+                                        ObjectPath[i].particle_type[k], &emit, ObjectPath[i].particle_rate[k], &tmtx, &numtx_identity
+                                    );
+                                } else if (ObjectPath[i].particle_rate[k] < 0) {
+                                    absrate = (ObjectPath[i].particle_rate[k] >= 0) ? (ObjectPath[i].particle_rate[k]) : (-ObjectPath[i].particle_rate[k]);
+                                    frame = (s32)(localframecount_156_N1 + ((float)j));
+                                    if (frame == ((frame / absrate) * absrate)) {
+                                        AddVariableShotDebrisEffectMtx2(
+                                            ObjectPath[i].particle_type[k], &emit, 1, &tmtx, &numtx_identity
+                                        );
+                                    }
+                                }
+                            }
+                        } else if (ObjectPath[i].particle_name[k][0] != 0) {
+                                ObjectPath[i].particle_type[k] = LookupDebrisEffect(ObjectPath[i].particle_name[k]);
+                                if (ObjectPath[i].particle_type[k] == -1) {
+                                    edobjParticleDestroy(i, k);
+                                    k--;
+                                }
+                        }
+                        k++;
+                    }
+                }
+                for (j = 0; j < ObjectPath[i].usedsound; j++) {
+                    if (ObjectPath[i].sound_id[j] != -1) {
+                        sid = -1;
+                        if (ObjectPath[i].sound_type[j] == 1) {
+                            if (((s32)(localframecount_156_N1 + dt) / (s32)ObjectPath[i].sound_time[j]) > (((s32)localframecount_156_N1) / (s32)ObjectPath[i].sound_time[j])) {
+                                sid = ObjectPath[i].sound_id[j];
+                            }
+                        } else {
+                            if ((ltime >= ObjectPath[i].sound_time[j])
+                                && (ObjectPath[i].sound_time[j] > ObjectPath[i].sound_last_time))
+                            {
+                                sid = ObjectPath[i].sound_id[j];
+                            }
+                            if (ObjectPath[i].oscillate != 0) {
+                                if (ltime <= ObjectPath[i].sound_time[j]) {
+                                    s32 abs_last = (s32)ObjectPath[i].sound_last_time;
+                                    if (ObjectPath[i].sound_time[j]
+                                        < ((float)((abs_last >= 0) ? (abs_last) : (-abs_last))))
+                                    {
+                                        sid = ObjectPath[i].sound_id[j];
+                                    }
+                                }
+                            }
+                        }
+                        if (sid != -1) {
+                            struct numtx_s* whichmtx;
+                            struct nuvec_s emit;
 
-next_object:
-        ;
+                            if (instanim != 0) {
+                                whichmtx = (struct numtx_s*)instanim;
+                            } else {
+                               whichmtx = (struct numtx_s*)instance;
+                            }
+                            if (((edobj_particle_mode != 0) || (edobj_sound_mode != 0)) && (edobj_nearest == i)) {
+                                whichmtx = (struct numtx_s*)instance;
+                            }
+                            NuVecMtxTransform(&emit, &ObjectPath[i].sound_offset[j], whichmtx);
+                            edbitsSoundPlay(&emit, sid);
+                        }
+                    } else if (ObjectPath[i].sound_name[j][0] != 0) {
+                        ObjectPath[i].sound_id[j] = edbitsLookupSoundFX(ObjectPath[i].sound_name[j]);
+                        if (ObjectPath[i].sound_id[j] == -1) {
+                            edobjSoundDestroy(i, j);
+                            j--;
+                        }
+                    }
+                }
+            if (ObjectPath[i].oscillate != 0) {
+                ObjectPath[i].sound_last_time = -ltime;
+            } else {
+                ObjectPath[i].sound_last_time = ltime;
+            }
+        }
     }
-    localframecount += frametime;
+
+    localframecount_156_N1 += dt;
 }
 
 //NGC MATCH
@@ -488,162 +437,365 @@ u32 reverse_endian_32(u32 arg0) {
     return (arg0 >> 0x18U) | ((arg0 >> 8U) & 0xFF00) | ((arg0 << 8) & 0xFF0000) | (arg0 << 0x18);
 }
 
-void edobjConvertPathToAnim(s32 sel) {
-    struct object_path_s *path;
-    struct nuinstance_s *instance;
-    struct nuinstanim_s *instanim;
+#define OBJECT_CURVESET(obj) (ObjectAnim[obj]->chunks[0]->animcurvesets[0])
+
+void edobjConvertPathToAnim(s32 sel)
+{
+    int rotanimflag;
+    unsigned int mask;
     struct nuanimkey_s *akey;
-    s32 i;
-    s32 j;
-    s32 used;
-    s32 last;
-    s32 total;
-    s32 rotanimflag;
-    s32 animated;
-    u32 mask;
-    float value;
-    float prev;
-    float next;
-    float base;
-    float slope;
+    int used;
+    int animflag;
+    int maskcount;
+    int i;
+    int j;
 
-    path = &ObjectPath[sel];
-    instance = &ObjectInstance[sel];
-    instance->anim = NULL;
-
-    NuMtxSetIdentity((struct Mtx *)&instance->mtx);
-    instance->mtx._30 = path->waypoint[0].x;
-    instance->mtx._31 = path->waypoint[0].y;
-    instance->mtx._32 = path->waypoint[0].z;
-
-    if (path->terrplatid == -1) {
-        path->terrplatid = NewPlatInst(&instance->mtx, edobjLookupInstanceIndex(path->objid));
+    ObjectInstance[sel].anim = 0;
+    NuMtxSetIdentity((struct Mtx *)&ObjectInstance[sel].mtx);
+    ObjectInstance[sel].mtx._30 = ObjectPath[sel].waypoint[0].x;
+    ObjectInstance[sel].mtx._31 = ObjectPath[sel].waypoint[0].y;
+    ObjectInstance[sel].mtx._32 = ObjectPath[sel].waypoint[0].z;
+    used = ObjectPath[sel].usedway;
+    if (ObjectPath[sel].terrplatid == -1) {
+        ObjectPath[sel].terrplatid = NewPlatInst(&ObjectInstance[sel].mtx,
+                                               edobjLookupInstanceIndex(ObjectPath[sel].objid));
     } else {
-        UpdatePlatinst(path->terrplatid, &instance->mtx);
-        PlatInstRotate(path->terrplatid, 0);
+        UpdatePlatinst(ObjectPath[sel].terrplatid, &ObjectInstance[sel].mtx);
+        PlatInstRotate(ObjectPath[sel].terrplatid, 0);
     }
-    PlatInstBounce(path->terrplatid, path->playergrav, path->tension, path->damping);
-
-    used = path->usedway;
-    if (used <= 1) {
+    PlatInstBounce(ObjectPath[sel].terrplatid, ObjectPath[sel].playergrav,
+                   ObjectPath[sel].tension, ObjectPath[sel].damping);
+    if (used < 2) {
         return;
     }
-
-    if (ObjectAnim[sel] == NULL) {
+    if (ObjectAnim[sel] == 0) {
         ObjectAnim[sel] = NuAnimDataCreate(1);
         ObjectAnim[sel]->chunks[0] = NuAnimDataChunkCreate(1);
+        ObjectAnim[sel]->nchunks = 1;
         ObjectAnim[sel]->chunks[0]->animcurvesets[0] = NuAnimCurveSetCreate(9);
-        ObjectAnim[sel]->chunks[0]->animcurvesets[0]->flags = 1;
+        OBJECT_CURVESET(sel)->flags = 1;
     }
-
     ObjectAnim[sel]->time = 1.0f;
-    total = 0;
+    maskcount = 0;
     mask = 1;
-    last = used - 1;
-    for (i = 0; i < last; i++) {
-        ObjectAnim[sel]->time += (float)path->waypoint_time[i];
-        total += path->waypoint_time[i];
-        mask |= 1U << total;
+    for (i = 0; i < used - 1; i++) {
+        ObjectAnim[sel]->time += ObjectPath[sel].waypoint_time[i];
+        maskcount += ObjectPath[sel].waypoint_time[i];
+        mask |= 1 << maskcount;
     }
 
-#define EDOBJ_BUILD_CURVE(curve_ix, value_expr, base_expr, prev_expr, next_expr, const_expr, negated, sets_rot) \
-    do { \
-        animated = 0; \
-        for (i = 1; i < used; i++) { \
-            value = (value_expr); \
-            base = (base_expr); \
-            if (value != base) { \
-                animated = 1; \
-                break; \
-            } \
-        } \
-        if (animated != 0) { \
-            if (sets_rot) { \
-                rotanimflag = 1; \
-            } \
-            ObjectAnim[sel]->chunks[0]->animcurvesets[0]->constants[curve_ix] = 3.4028235e38f; \
-            if (ObjectAnim[sel]->chunks[0]->animcurvesets[0]->set[curve_ix] == NULL) { \
-                ObjectAnim[sel]->chunks[0]->animcurvesets[0]->set[curve_ix] = NuAnimCurveCreate(used); \
-            } \
-            if (ObjectAnim[sel]->chunks[0]->animcurvesets[0]->set[curve_ix]->numkeys != (u32)used) { \
-                NuAnimCurveDestroy(ObjectAnim[sel]->chunks[0]->animcurvesets[0]->set[curve_ix]); \
-                ObjectAnim[sel]->chunks[0]->animcurvesets[0]->set[curve_ix] = NuAnimCurveCreate(used); \
-            } \
-            ObjectAnim[sel]->chunks[0]->animcurvesets[0]->set[curve_ix]->mask = reverse_endian_32(mask); \
-            for (i = 0; i < used; i++) { \
-                akey = &ObjectAnim[sel]->chunks[0]->animcurvesets[0]->set[curve_ix]->animkeys[i]; \
-                akey->time = 1.0f; \
-                for (j = 0; j < i; j++) { \
-                    akey->time += (float)path->waypoint_time[j]; \
-                } \
-                if (i == last) { \
-                    akey->dtime = 0.0f; \
-                } else { \
-                    akey->dtime = 1.0f / (float)path->waypoint_time[i]; \
-                } \
-                value = (value_expr); \
-                base = (const_expr); \
-                if (i == 0) { \
-                    next = (next_expr); \
-                    slope = (next - value) * 0.5f * path->waypoint_speed[i]; \
-                } else if (i == last) { \
-                    prev = (prev_expr); \
-                    slope = (value - prev) * 0.5f * path->waypoint_speed[i]; \
-                } else { \
-                    prev = (prev_expr); \
-                    next = (next_expr); \
-                    slope = (next - prev) * path->waypoint_speed[i]; \
-                } \
-                if (negated) { \
-                    akey->c = -slope; \
-                    akey->d = -(value - base); \
-                } else { \
-                    akey->c = slope; \
-                    akey->d = value - base; \
-                } \
-            } \
-        } else { \
-            ObjectAnim[sel]->chunks[0]->animcurvesets[0]->constants[curve_ix] = (const_expr); \
-            if (ObjectAnim[sel]->chunks[0]->animcurvesets[0]->set[curve_ix] != NULL) { \
-                NuAnimCurveDestroy(ObjectAnim[sel]->chunks[0]->animcurvesets[0]->set[curve_ix]); \
-                ObjectAnim[sel]->chunks[0]->animcurvesets[0]->set[curve_ix] = NULL; \
-            } \
-        } \
-    } while (0)
-
-    rotanimflag = 0;
-    EDOBJ_BUILD_CURVE(0, path->waypoint[i].x, path->waypoint[0].x, path->waypoint[i - 1].x, path->waypoint[i + 1].x, 0.0f, 0, 0);
-    EDOBJ_BUILD_CURVE(1, path->waypoint[i].y, path->waypoint[0].y, path->waypoint[i - 1].y, path->waypoint[i + 1].y, 0.0f, 0, 0);
-    EDOBJ_BUILD_CURVE(2, path->waypoint[i].z, path->waypoint[0].z, path->waypoint[i - 1].z, path->waypoint[i + 1].z, 0.0f, 1, 0);
-    EDOBJ_BUILD_CURVE(3, path->waypoint_rot[i].x, path->waypoint_rot[0].x, path->waypoint_rot[i - 1].x, path->waypoint_rot[i + 1].x, path->waypoint_rot[0].x, 0, 1);
-    EDOBJ_BUILD_CURVE(4, path->waypoint_rot[i].y, path->waypoint_rot[0].y, path->waypoint_rot[i - 1].y, path->waypoint_rot[i + 1].y, path->waypoint_rot[0].y, 0, 1);
-    EDOBJ_BUILD_CURVE(5, path->waypoint_rot[i].z, path->waypoint_rot[0].z, path->waypoint_rot[i - 1].z, path->waypoint_rot[i + 1].z, path->waypoint_rot[0].z, 0, 1);
-#undef EDOBJ_BUILD_CURVE
-
-    if ((path->waypoint_rot[0].x != 0.0f) ||
-        (path->waypoint_rot[0].y != 0.0f) ||
-        (path->waypoint_rot[0].z != 0.0f)) {
-        rotanimflag = 1;
+    animflag = 0;
+    for (i = 1; i < used; i++) {
+        if (ObjectPath[sel].waypoint[i].x != ObjectPath[sel].waypoint[0].x) {
+            animflag = 1;
+            break;
+        }
     }
-
-    instanim = &ObjectInstAnim[sel];
-    instance->anim = instanim;
-    if (path->terrplatid != -1) {
-        UpdatePlatinst(path->terrplatid, &instanim->mtx);
-        if (rotanimflag != 0) {
-            PlatInstRotate(path->terrplatid, 1);
+    if (animflag) {
+        OBJECT_CURVESET(sel)->constants[0] = 3.4028235e38f;
+        if (OBJECT_CURVESET(sel)->set[0] == 0) {
+            OBJECT_CURVESET(sel)->set[0] = NuAnimCurveCreate(used);
+        }
+        if (OBJECT_CURVESET(sel)->set[0]->numkeys != used) {
+            NuAnimCurveDestroy(OBJECT_CURVESET(sel)->set[0]);
+            OBJECT_CURVESET(sel)->set[0] = NuAnimCurveCreate(used);
+        }
+        OBJECT_CURVESET(sel)->set[0]->mask = reverse_endian_32(mask);
+        for (i = 0; i < used; i++) {
+            akey = &OBJECT_CURVESET(sel)->set[0]->animkeys[i];
+            akey->time = 1.0f;
+            for (j = 0; j < i; j++) {
+                akey->time += ObjectPath[sel].waypoint_time[j];
+            }
+            if (i == used - 1) {
+                akey->dtime = 0.0f;
+            } else {
+                akey->dtime = 1.0 / (float)ObjectPath[sel].waypoint_time[i];
+            }
+            if (i == 0) {
+                akey->c = (ObjectPath[sel].waypoint[i + 1].x - ObjectPath[sel].waypoint[i].x) * 0.5
+                       * ObjectPath[sel].waypoint_speed[i];
+            } else if (i == used - 1) {
+                akey->c = (ObjectPath[sel].waypoint[i].x - ObjectPath[sel].waypoint[i - 1].x) * 0.5
+                       * ObjectPath[sel].waypoint_speed[i];
+            } else {
+                akey->c = (ObjectPath[sel].waypoint[i + 1].x - ObjectPath[sel].waypoint[i - 1].x)
+                       * ObjectPath[sel].waypoint_speed[i];
+            }
+            akey->d = ObjectPath[sel].waypoint[i].x - ObjectPath[sel].waypoint[0].x;
+        }
+    } else {
+        OBJECT_CURVESET(sel)->constants[0] = 0.0f;
+        if (OBJECT_CURVESET(sel)->set[0] != 0) {
+            NuAnimCurveDestroy(OBJECT_CURVESET(sel)->set[0]);
+            OBJECT_CURVESET(sel)->set[0] = 0;
         }
     }
 
-    instanim->tfactor = path->speed;
-    instanim->playing = 0;
-    instanim->repeating = path->repeat;
-    instanim->oscillate = path->oscillate;
-    if (path->oscillate == 0) {
-        instanim->backwards = 0;
+    animflag = 0;
+    for (i = 1; i < used; i++) {
+        if (ObjectPath[sel].waypoint[i].y != ObjectPath[sel].waypoint[0].y) {
+            animflag = 1;
+            break;
+        }
     }
-    instanim->anim_ix = sel;
-    instanim->tinterval = path->pause;
+    if (animflag) {
+        OBJECT_CURVESET(sel)->constants[1] = 3.4028235e38f;
+        if (OBJECT_CURVESET(sel)->set[1] == 0) {
+            OBJECT_CURVESET(sel)->set[1] = NuAnimCurveCreate(used);
+        }
+        if (OBJECT_CURVESET(sel)->set[1]->numkeys != used) {
+            NuAnimCurveDestroy(OBJECT_CURVESET(sel)->set[1]);
+            OBJECT_CURVESET(sel)->set[1] = NuAnimCurveCreate(used);
+        }
+        OBJECT_CURVESET(sel)->set[1]->mask = reverse_endian_32(mask);
+        for (i = 0; i < used; i++) {
+            akey = &OBJECT_CURVESET(sel)->set[1]->animkeys[i];
+            akey->time = 1.0f;
+            for (j = 0; j < i; j++) {
+                akey->time += ObjectPath[sel].waypoint_time[j];
+            }
+            if (i == used - 1) {
+                akey->dtime = 0.0f;
+            } else {
+                akey->dtime = 1.0 / (float)ObjectPath[sel].waypoint_time[i];
+            }
+            if (i == 0) {
+                akey->c = (ObjectPath[sel].waypoint[i + 1].y - ObjectPath[sel].waypoint[i].y) * 0.5
+                       * ObjectPath[sel].waypoint_speed[i];
+            } else if (i == used - 1) {
+                akey->c = (ObjectPath[sel].waypoint[i].y - ObjectPath[sel].waypoint[i - 1].y) * 0.5
+                       * ObjectPath[sel].waypoint_speed[i];
+            } else {
+                akey->c = (ObjectPath[sel].waypoint[i + 1].y - ObjectPath[sel].waypoint[i - 1].y)
+                       * ObjectPath[sel].waypoint_speed[i];
+            }
+            akey->d = ObjectPath[sel].waypoint[i].y - ObjectPath[sel].waypoint[0].y;
+        }
+    } else {
+        OBJECT_CURVESET(sel)->constants[1] = 0.0f;
+        if (OBJECT_CURVESET(sel)->set[1] != 0) {
+            NuAnimCurveDestroy(OBJECT_CURVESET(sel)->set[1]);
+            OBJECT_CURVESET(sel)->set[1] = 0;
+        }
+    }
+
+    animflag = 0;
+    for (i = 1; i < used; i++) {
+        if (ObjectPath[sel].waypoint[i].z != ObjectPath[sel].waypoint[0].z) {
+            animflag = 1;
+            break;
+        }
+    }
+    if (animflag) {
+        OBJECT_CURVESET(sel)->constants[2] = 3.4028235e38f;
+        if (OBJECT_CURVESET(sel)->set[2] == 0) {
+            OBJECT_CURVESET(sel)->set[2] = NuAnimCurveCreate(used);
+        }
+        if (OBJECT_CURVESET(sel)->set[2]->numkeys != used) {
+            NuAnimCurveDestroy(OBJECT_CURVESET(sel)->set[2]);
+            OBJECT_CURVESET(sel)->set[2] = NuAnimCurveCreate(used);
+        }
+        OBJECT_CURVESET(sel)->set[2]->mask = reverse_endian_32(mask);
+        for (i = 0; i < used; i++) {
+            akey = &OBJECT_CURVESET(sel)->set[2]->animkeys[i];
+            akey->time = 1.0f;
+            for (j = 0; j < i; j++) {
+                akey->time += ObjectPath[sel].waypoint_time[j];
+            }
+            if (i == used - 1) {
+                akey->dtime = 0.0f;
+            } else {
+                akey->dtime = 1.0 / (float)ObjectPath[sel].waypoint_time[i];
+            }
+            if (i == 0) {
+                akey->c = (ObjectPath[sel].waypoint[i + 1].z - ObjectPath[sel].waypoint[i].z) * 0.5
+                       * ObjectPath[sel].waypoint_speed[i];
+            } else if (i == used - 1) {
+                akey->c = (ObjectPath[sel].waypoint[i].z - ObjectPath[sel].waypoint[i - 1].z) * 0.5
+                       * ObjectPath[sel].waypoint_speed[i];
+            } else {
+                akey->c = -(ObjectPath[sel].waypoint[i + 1].z - ObjectPath[sel].waypoint[i - 1].z)
+                       * ObjectPath[sel].waypoint_speed[i];
+            }
+            akey->d = -(ObjectPath[sel].waypoint[i].z - ObjectPath[sel].waypoint[0].z);
+        }
+    } else {
+        OBJECT_CURVESET(sel)->constants[2] = 0.0f;
+        if (OBJECT_CURVESET(sel)->set[2] != 0) {
+            NuAnimCurveDestroy(OBJECT_CURVESET(sel)->set[2]);
+            OBJECT_CURVESET(sel)->set[2] = 0;
+        }
+    }
+
+    rotanimflag = 0;
+    animflag = 0;
+    for (i = 1; i < used; i++) {
+        if (ObjectPath[sel].waypoint_rot[i].x != ObjectPath[sel].waypoint_rot[0].x) {
+            animflag = 1;
+            rotanimflag = 1;
+            break;
+        }
+    }
+    if (animflag) {
+        OBJECT_CURVESET(sel)->constants[3] = 3.4028235e38f;
+        if (OBJECT_CURVESET(sel)->set[3] == 0) {
+            OBJECT_CURVESET(sel)->set[3] = NuAnimCurveCreate(used);
+        }
+        if (OBJECT_CURVESET(sel)->set[3]->numkeys != used) {
+            NuAnimCurveDestroy(OBJECT_CURVESET(sel)->set[3]);
+            OBJECT_CURVESET(sel)->set[3] = NuAnimCurveCreate(used);
+        }
+        OBJECT_CURVESET(sel)->set[3]->mask = reverse_endian_32(mask);
+        for (i = 0; i < used; i++) {
+            akey = &OBJECT_CURVESET(sel)->set[3]->animkeys[i];
+            akey->time = 1.0f;
+            for (j = 0; j < i; j++) {
+                akey->time += ObjectPath[sel].waypoint_time[j];
+            }
+            if (i == used - 1) {
+                akey->dtime = 0.0f;
+            } else {
+                akey->dtime = 1.0 / (float)ObjectPath[sel].waypoint_time[i];
+            }
+            if (i == 0) {
+                akey->c = (ObjectPath[sel].waypoint_rot[i + 1].x - ObjectPath[sel].waypoint_rot[i].x) * 0.5
+                       * ObjectPath[sel].waypoint_speed[i];
+            } else if (i == used - 1) {
+                akey->c = (ObjectPath[sel].waypoint_rot[i].x - ObjectPath[sel].waypoint_rot[i - 1].x) * 0.5
+                       * ObjectPath[sel].waypoint_speed[i];
+            } else {
+                akey->c = (ObjectPath[sel].waypoint_rot[i + 1].x - ObjectPath[sel].waypoint_rot[i - 1].x)
+                       * ObjectPath[sel].waypoint_speed[i];
+            }
+            akey->d = ObjectPath[sel].waypoint_rot[i].x;
+        }
+    } else {
+        OBJECT_CURVESET(sel)->constants[3] = ObjectPath[sel].waypoint_rot[0].x;
+        if (OBJECT_CURVESET(sel)->set[3] != 0) {
+            NuAnimCurveDestroy(OBJECT_CURVESET(sel)->set[3]);
+            OBJECT_CURVESET(sel)->set[3] = 0;
+        }
+    }
+
+    animflag = 0;
+    for (i = 1; i < used; i++) {
+        if (ObjectPath[sel].waypoint_rot[i].y != ObjectPath[sel].waypoint_rot[0].y) {
+            animflag = 1;
+            rotanimflag = 1;
+            break;
+        }
+    }
+    if (animflag) {
+        OBJECT_CURVESET(sel)->constants[4] = 3.4028235e38f;
+        if (OBJECT_CURVESET(sel)->set[4] == 0) {
+            OBJECT_CURVESET(sel)->set[4] = NuAnimCurveCreate(used);
+        }
+        if (OBJECT_CURVESET(sel)->set[4]->numkeys != used) {
+            NuAnimCurveDestroy(OBJECT_CURVESET(sel)->set[4]);
+            OBJECT_CURVESET(sel)->set[4] = NuAnimCurveCreate(used);
+        }
+        OBJECT_CURVESET(sel)->set[4]->mask = reverse_endian_32(mask);
+        for (i = 0; i < used; i++) {
+            akey = &OBJECT_CURVESET(sel)->set[4]->animkeys[i];
+            akey->time = 1.0f;
+            for (j = 0; j < i; j++) {
+                akey->time += ObjectPath[sel].waypoint_time[j];
+            }
+            if (i == used - 1) {
+                akey->dtime = 0.0f;
+            } else {
+                akey->dtime = 1.0 / (float)ObjectPath[sel].waypoint_time[i];
+            }
+            if (i == 0) {
+                akey->c = (ObjectPath[sel].waypoint_rot[i + 1].y - ObjectPath[sel].waypoint_rot[i].y) * 0.5
+                       * ObjectPath[sel].waypoint_speed[i];
+            } else if (i == used - 1) {
+                akey->c = (ObjectPath[sel].waypoint_rot[i].y - ObjectPath[sel].waypoint_rot[i - 1].y) * 0.5
+                       * ObjectPath[sel].waypoint_speed[i];
+            } else {
+                akey->c = (ObjectPath[sel].waypoint_rot[i + 1].y - ObjectPath[sel].waypoint_rot[i - 1].y)
+                       * ObjectPath[sel].waypoint_speed[i];
+            }
+            akey->d = ObjectPath[sel].waypoint_rot[i].y;
+        }
+    } else {
+        OBJECT_CURVESET(sel)->constants[4] = ObjectPath[sel].waypoint_rot[0].y;
+        if (OBJECT_CURVESET(sel)->set[4] != 0) {
+            NuAnimCurveDestroy(OBJECT_CURVESET(sel)->set[4]);
+            OBJECT_CURVESET(sel)->set[4] = 0;
+        }
+    }
+
+    animflag = 0;
+    for (i = 1; i < used; i++) {
+        if (ObjectPath[sel].waypoint_rot[i].z != ObjectPath[sel].waypoint_rot[0].z) {
+            animflag = 1;
+            rotanimflag = 1;
+            break;
+        }
+    }
+    if (animflag) {
+        OBJECT_CURVESET(sel)->constants[5] = 3.4028235e38f;
+        if (OBJECT_CURVESET(sel)->set[5] == 0) {
+            OBJECT_CURVESET(sel)->set[5] = NuAnimCurveCreate(used);
+        }
+        if (OBJECT_CURVESET(sel)->set[5]->numkeys != used) {
+            NuAnimCurveDestroy(OBJECT_CURVESET(sel)->set[5]);
+            OBJECT_CURVESET(sel)->set[5] = NuAnimCurveCreate(used);
+        }
+        OBJECT_CURVESET(sel)->set[5]->mask = reverse_endian_32(mask);
+        for (i = 0; i < used; i++) {
+            akey = &OBJECT_CURVESET(sel)->set[5]->animkeys[i];
+            akey->time = 1.0f;
+            for (j = 0; j < i; j++) {
+                akey->time += ObjectPath[sel].waypoint_time[j];
+            }
+            if (i == used - 1) {
+                akey->dtime = 0.0f;
+            } else {
+                akey->dtime = 1.0 / (float)ObjectPath[sel].waypoint_time[i];
+            }
+            if (i == 0) {
+                akey->c = (ObjectPath[sel].waypoint_rot[i + 1].z - ObjectPath[sel].waypoint_rot[i].z) * 0.5
+                       * ObjectPath[sel].waypoint_speed[i];
+            } else if (i == used - 1) {
+                akey->c = (ObjectPath[sel].waypoint_rot[i].z - ObjectPath[sel].waypoint_rot[i - 1].z) * 0.5
+                       * ObjectPath[sel].waypoint_speed[i];
+            } else {
+                akey->c = (ObjectPath[sel].waypoint_rot[i + 1].z - ObjectPath[sel].waypoint_rot[i - 1].z)
+                       * ObjectPath[sel].waypoint_speed[i];
+            }
+            akey->d = ObjectPath[sel].waypoint_rot[i].z;
+        }
+    } else {
+        OBJECT_CURVESET(sel)->constants[5] = ObjectPath[sel].waypoint_rot[0].z;
+        if (OBJECT_CURVESET(sel)->set[5] != 0) {
+            NuAnimCurveDestroy(OBJECT_CURVESET(sel)->set[5]);
+            OBJECT_CURVESET(sel)->set[5] = 0;
+        }
+    }
+
+    if (ObjectPath[sel].waypoint_rot[0].x != 0.0f || ObjectPath[sel].waypoint_rot[0].y != 0.0f
+        || ObjectPath[sel].waypoint_rot[0].z != 0.0f) {
+        rotanimflag = 1;
+    }
+    ObjectInstance[sel].anim = &ObjectInstAnim[sel];
+    if (ObjectPath[sel].terrplatid != -1) {
+        UpdatePlatinst(ObjectPath[sel].terrplatid, &ObjectInstAnim[sel].mtx);
+        if (rotanimflag) {
+            PlatInstRotate(ObjectPath[sel].terrplatid, 1);
+        }
+    }
+    ObjectInstAnim[sel].tfactor = ObjectPath[sel].speed;
+    ObjectInstAnim[sel].playing = 0;
+    ObjectInstAnim[sel].repeating = ObjectPath[sel].repeat;
+    ObjectInstAnim[sel].oscillate = ObjectPath[sel].oscillate;
+    if (!ObjectPath[sel].oscillate) {
+        ObjectInstAnim[sel].backwards = 0;
+    }
+    ObjectInstAnim[sel].anim_ix = sel;
+    ObjectInstAnim[sel].tinterval = ObjectPath[sel].pause;
 }
 
 //NGC MATCH

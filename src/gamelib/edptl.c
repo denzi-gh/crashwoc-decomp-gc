@@ -26,7 +26,7 @@ extern struct edpp_ptldesc_s edpp_ptls[];
 extern struct nuvec_s edpp_cam_pos;
 extern s32 edpp_nextalloc;
 extern s32 edpp_nearest;
-extern struct debinftype effecttypes[128];
+extern volatile struct debinftype effecttypes[128];
 extern s32 effect_types_used;
 
 void DebFreeInstantly(s32 *key);
@@ -321,13 +321,12 @@ void FileLoadSingleEffectType(struct debinftype *effect,s32 version,char list) {
   return;
 }
 
-//NGC 99% - BLOCKER: same stwx loop optimization as edppMergeEffects; also blt/ble sentinel diff in version<5 path
+//NGC 99% - BLOCKER: final loop; target keeps i*852 as a shared index (stwx) with effecttypes+728 as base, ours folds both stores onto one pointer (same as edppMergeEffects)
 s32 edppLoadEffects(char* file, char list) {
     s32 i;
     s32 version;
     s32 numptls;
     s32 maxversion = 15;
-    s32 maxptl;
 
     if (EdFileOpen(file, NUFILE_READ) != 0) {
         version = EdFileReadInt();
@@ -381,7 +380,9 @@ s32 edppLoadEffects(char* file, char list) {
     if (list == 1 || list == 2) {
         ParticleReset();
         if (version < 5) {
-            for (i = 0; i <= 255; i++) {
+            s32 maxptl = 256;
+
+            for (i = 0; i < maxptl; i++) {
                 EdFileRead(&edpp_ptls[i].pos, sizeof(struct nuvec_s));
                 edpp_ptls[i].type = EdFileReadInt();
                 edpp_ptls[i].handle = EdFileReadInt();
@@ -398,6 +399,8 @@ s32 edppLoadEffects(char* file, char list) {
                 edpp_ptls[i].trigger_var = 0.0f;
             }
         } else {
+            s32 maxptl;
+
             numptls = EdFileReadInt();
             maxptl = numptls > 256 ? 256 : numptls;
             for (i = 0; i < maxptl; i++) {

@@ -3,14 +3,14 @@ WIP
 
 AddAward 99% (regswap)
 DrawAwards MATCH (check)
-UpdateWumpa 98%**
+UpdateWumpa MATCH
 UpdateMask  95% (regswap)
 ProcMenu 99% (merge)
-GameTiming 99% (regswap)
-NewLevelTime 87%**
+GameTiming MATCH
+NewLevelTime MATCH
 BonusTiming 98% (regswap)
-DrawProbeFX  95% (regswap)
-Draw3DObject 98% (branch)
+DrawProbeFX  85.32% (scheduling/regswap)
+Draw3DObject MATCH
 DrawMenu 84%*
 
 HubDrawItems 89%
@@ -133,6 +133,8 @@ struct plritem_s {
 
 struct gdeb_s {
     s32 i;
+    char* name;
+    u64 levbits;
 };
 
 struct tersurface_s {
@@ -275,7 +277,7 @@ extern struct nuvec_s vtog_newpos;
 extern s32 i_tempwumpa;
 extern s32 i_screenwumpa;
 extern s32 WUMPACOUNT;
-extern u16 wumpa_a[3];
+extern u16 wumpa_a[];
 extern WumpaFruit Wumpa[320];
 extern struct winfo_s WInfo[8];
 extern struct wscr_s WScr[32];
@@ -706,7 +708,7 @@ void JonProbe(void) {
                 }
                 probespk = probepos;
                 vec = probepos;
-                AddVariableShotDebrisEffect(GDeb[304].i, &vec, 1, -0x8000, 0);
+                AddVariableShotDebrisEffect(GDeb[76].i, &vec, 1, -0x8000, 0);
                 probecol += 0xf0;
                 if (probecol > 0x1e00) {
                     probecol = 0x1e00;
@@ -750,8 +752,8 @@ void JonProbe(void) {
                 if (Paused == 0) {
                     NuLgtArcLaser(0, &vec1, &vec, &vec2, 0.1f, 0.1f, 0.01f, dx, col + 0x00ff7f3f);
                     NuLgtArcLaser(0, &vec1, &vec, &vec2, 0.4f, 0.3f, 0.001f, dx, col + 0x00800040);
-                    AddVariableShotDebrisEffect(GDeb[312].i, &vec1, 1, 0, 0);
-                    AddVariableShotDebrisEffect(GDeb[312].i, &vec, 1, -0x8000, 0);
+                    AddVariableShotDebrisEffect(GDeb[78].i, &vec1, 1, 0, 0);
+                    AddVariableShotDebrisEffect(GDeb[78].i, &vec, 1, -0x8000, 0);
                 }
             }
         }
@@ -1042,7 +1044,7 @@ void HubSelect(struct creature_s* c) {
           } else {
             pos.y = p0->y + 0.25f;
           }
-          AddVariableShotDebrisEffect(GDeb[HData[i].i_gdeb << 2].i, &pos, 1, 0, 0);
+          AddVariableShotDebrisEffect(GDeb[HData[i].i_gdeb].i, &pos, 1, 0, 0);
         }
       } else {
         hublevelopen[j + i * 6] = 1;
@@ -1670,7 +1672,7 @@ s32 HitWumpa(struct obj_s* obj, s32 destroy) {
                 if (dx + dz < r2) {
                     if (destroy != 0) {
                         key = -1;
-                        AddFiniteShotDebrisEffect(&key, GDeb[520].i, &wumpa->pos, 1);
+                        AddFiniteShotDebrisEffect(&key, GDeb[130].i, &wumpa->pos, 1);
                         wumpa->active = 0;
                     } else {
                         FlyWumpa(wumpa);
@@ -1699,107 +1701,96 @@ void FlyWumpa(struct wumpa_s* wumpa) {
   return;
 }
 
+//MATCH NGC
 void UpdateWumpa(void) {
-  u16 la[3];
-  struct nuvec_s scale;
-  struct obj_s hitobj;
-  struct winfo_s *info;
-  struct wumpa_s *wumpa;
-  s32 key;
-  s32 active;
-  s32 i;
-  u16 rx, rz;
-  f32 s;
+    struct winfo_s *info;
+    u16 a[3];
+    u16 xrot;
+    u16 zrot;
+    struct nuvec_s s;
+    float f;
+    s32 i;
+    s32 active;
+    s32 old;
+    s32 key;
+    struct wumpa_s *wumpa;
+    struct obj_s obj;
 
-  wumpa_a[0] += 0x222;
-  wumpa_a[1] += 0x280;
-  wumpa_a[2] += 0x355;
-  la[0] = wumpa_a[0];
-  la[1] = wumpa_a[1];
-  la[2] = wumpa_a[2];
-
-  info = WInfo;
-  for (i = 8; i != 0; i--) {
-    info->angle -= info->spin;
-    info->dy = NuTrigTable[la[0]] * 0.05f;
-    rx = (u16)(s32)(NuTrigTable[la[1]] * 2048.0f);
-    rz = (u16)(s32)(NuTrigTable[la[2]] * 2048.0f);
-    info->m = numtx_identity;
-    scale.x = info->scale;
-    scale.z = info->scale;
-    scale.y = info->scale;
-    NuMtxSetScale((struct numtx_s *)info, &scale);
-    NuMtxRotateY((struct numtx_s *)info, info->angle);
-    NuMtxRotateZ((struct numtx_s *)info, rz);
-    NuMtxRotateX((struct numtx_s *)info, rx);
-    la[0] += 0x2000;
-    la[1] += 0x2000;
-    la[2] += 0x2000;
-    info++;
-  }
-
-  hitobj.bot = -0.1f;
-  hitobj.top = 0.1f;
-  hitobj.flags = 0;
-  hitobj.finished = '\0';
-  hitobj.dead = '\0';
-  hitobj.attack = 0;
-  hitobj.pLOCATOR = NULL;
-
-  wumpa = Wumpa;
-  for (i = 0x140; i != 0; i--, wumpa++) {
-    active = (s8)wumpa->active;
-    if (active == 1) {
-      wumpa->time += (1.0f / 60.0f);
-      if (wumpa->time >= 0.75f) {
-        wumpa->time = 0.75f;
-        wumpa->pos = wumpa->pos1;
-        wumpa->active = 2;
-      } else {
-        f32 t = wumpa->time / 0.75f;
-        wumpa->pos.x = (wumpa->pos1.x - wumpa->pos0.x) * t + wumpa->pos0.x;
-        wumpa->pos.y = (wumpa->pos1.y - wumpa->pos0.y) * t + wumpa->pos0.y;
-        wumpa->pos.z = (wumpa->pos1.z - wumpa->pos0.z) * t + wumpa->pos0.z;
-        wumpa->pos.y += NuTrigTable[(u16)(s32)(t * 32768.0f)];
-      }
-    } else if (active == 3) {
-      wumpa->time += (1.0f / 60.0f);
-      if (wumpa->time < wumpa->duration) {
-        NuVecAdd(&wumpa->pos, &wumpa->pos, &wumpa->mom);
-        hitobj.pos = wumpa->pos;
-        s = 1.0f - wumpa->time * 0.5f;
-        hitobj.RADIUS = s * 0.1f;
-        hitobj.SCALE = s;
-        if (wumpa->destroy == 2) {
-          hitobj.SCALE = s + s;
-        }
-        if (HitCreatures(&hitobj, 1, 2) != 0 ||
-            HitCrates(&hitobj, (wumpa->destroy != 0) ? 1 : 0) != 0 ||
-            HitItems(&hitobj) != 0 ||
-            (wumpa->destroy != 0 && HitWumpa(&hitobj, 1) != 0))
-        {
-          key = -1;
-          AddFiniteShotDebrisEffect(&key, GDeb[520].i, &wumpa->pos, 1);
-          wumpa->active = 0;
-        }
-      } else {
-        key = -1;
-        AddFiniteShotDebrisEffect(&key, GDeb[520].i, &wumpa->pos, 1);
-        wumpa->active = 0;
-      }
+    a[0] = wumpa_a[0] += 0x222;
+    a[1] = wumpa_a[1] += 0x280;
+    a[2] = wumpa_a[2] += 0x355;
+    info = WInfo;
+    for (i = 0; i < 8; i++, info++) {
+        info->angle -= info->spin;
+        info->dy = NuTrigTable[a[0]] * 0.05f;
+        xrot = NuTrigTable[a[1]] * 2048.0f;
+        zrot = NuTrigTable[a[2]] * 2048.0f;
+        info->m = numtx_identity;
+        s.x = s.y = s.z = info->scale;
+        NuMtxSetScale(&info->m,&s);
+        NuMtxRotateY(&info->m,(s32)info->angle);
+        NuMtxRotateZ(&info->m,zrot);
+        NuMtxRotateX(&info->m,(s32)xrot);
+        a[0] = a[0] + 0x2000;
+        a[1] = a[1] + 0x2000;
+        a[2] = a[2] + 0x2000;
     }
-
-    if (active != 0 && wumpa->active == 0) {
-      if ((s8)wumpa->destroy != 0) {
-        if ((s8)wumpa->destroy == 2) {
-          AddKaboom(0x100, &wumpa->pos, 0.0f);
-          GameSfx(0x31, &wumpa->pos);
-        } else {
-          GameSfx(4, &wumpa->pos);
+    wumpa = Wumpa;
+    obj.bot = -0.1f;
+    obj.top = 0.1f;
+    obj.finished = 0;
+    obj.dead = 0;
+    obj.attack = 0;
+    obj.pLOCATOR = NULL;
+    obj.flags = 0;
+    for (i = 0; i < 0x140; i++, wumpa++) {
+        active = wumpa->active;
+        if (active == 1) {
+            wumpa->time += 0.016666668f;
+            if (wumpa->time >= 0.75f) {
+                wumpa->time = 0.75f;
+                wumpa->pos = wumpa->pos1;
+                wumpa->active = 2;
+            }
+            else {
+                wumpa->pos.x = wumpa->pos0.x + (wumpa->pos1.x - wumpa->pos0.x) * (wumpa->time / 0.75f);
+                wumpa->pos.y = wumpa->pos0.y + (wumpa->pos1.y - wumpa->pos0.y) * (wumpa->time / 0.75f);
+                wumpa->pos.z = wumpa->pos0.z + (wumpa->pos1.z - wumpa->pos0.z) * (wumpa->time / 0.75f);
+                wumpa->pos.y += NuTrigTable[(s32)((wumpa->time / 0.75f) * 32768.0f) & 0xffff];
+            }
         }
-      }
+        else if (active == 3) {
+            wumpa->time += 0.016666668f;
+            if (wumpa->time < wumpa->duration) {
+                NuVecAdd(&wumpa->pos,&wumpa->pos,&wumpa->mom);
+                obj.pos = wumpa->pos;
+                obj.SCALE = 1.0f - (wumpa->time * 0.5f);
+                obj.RADIUS = obj.SCALE * 0.1f;
+                if (wumpa->destroy == 2) {
+                    obj.SCALE = obj.SCALE + obj.SCALE;
+                }
+                if ((HitCreatures(&obj, 1, 2) != 0) || (HitCrates(&obj, wumpa->destroy != 0) != 0) || (HitItems(&obj) != 0) || ((wumpa->destroy != 0) && (HitWumpa(&obj, 1) != 0))) {
+                    key = -1;
+                    AddFiniteShotDebrisEffect(&key,GDeb[130].i,&wumpa->pos,1);
+                    wumpa->active = 0;
+                }
+            } else {
+                key = -1;
+                AddFiniteShotDebrisEffect(&key,GDeb[130].i,&wumpa->pos,1);
+                wumpa->active = 0;
+            }
+        }
+
+        if (((active != 0) && (wumpa->active == 0)) && (wumpa->destroy != 0)) {
+            if (wumpa->destroy == 2) {
+                AddKaboom(0x100,&wumpa->pos,0.0f);
+                GameSfx(0x31,&wumpa->pos);
+            }
+            else {
+                GameSfx(4,&wumpa->pos);
+            }
+        }
     }
-  }
 }
 
 //MATCH NGC
@@ -1994,49 +1985,55 @@ void AddTempWumpa(float x,float y,float z,struct cratesarray_s *crate,s32 n) {
   return;
 }
 
-//99% NGC
+//NGC MATCH
 s32 Draw3DObject(s32 object,struct nuvec_s *pos,u16 xrot,u16 yrot,u16 zrot,float scalex,
                 float scaley,float scalez,struct nugscn_s *scn,struct nuspecial_s *obj,s32 rot) {
   struct numtx_s m;
   struct nuvec_s s;
-  s32 i;
-  
-  if (((scn == NULL) || (obj == NULL)) || (scalex == 0.0f && scaley == 0.0f && scalez == 0.0f)) {
-      i = 0;
-  }
-  else if (Level != 0x25) {
+  s32 o;
+
+  if ((scn != NULL) && (obj != NULL) && ((scalex != 0.0f) || (scaley != 0.0f) || (scalez != 0.0f))) {
+    if (Level != 0x25) {
+      if (object == 1) {
+        o = 0x85;
+      } else if (object == 2) {
+        o = 0x86;
+      } else {
+        o = (object == 3) ? 0x87 : -1;
+      }
+    }
     s.x = scalex;
     s.y = scaley;
     s.z = scalez;
     NuMtxSetScale(&m,&s);
     switch(rot) {
-                case 0:
-                    if (xrot != NULL) {
-                        NuMtxRotateX(&m,(s32)xrot);
-                    }
-                    if (yrot != NULL) {
-                        NuMtxRotateY(&m,(s32)yrot);
-                    }
-                    if (zrot != NULL) {
-                        NuMtxRotateZ(&m,(s32)zrot);
-                    }
-                    break;
-                case 1:
-                    if (yrot != NULL) {
-                        NuMtxRotateY(&m,(s32)yrot);
-                    }
-                    if (xrot != NULL) {
-                        NuMtxRotateX(&m,(s32)xrot);
-                    }
-                    if (zrot != NULL) {
-                        NuMtxRotateZ(&m,(s32)zrot);
-                    }
-                    break;
+      case 0:
+        if (xrot != 0) {
+          NuMtxRotateX(&m,(s32)xrot);
+        }
+        if (yrot != 0) {
+          NuMtxRotateY(&m,(s32)yrot);
+        }
+        if (zrot != 0) {
+          NuMtxRotateZ(&m,(s32)zrot);
+        }
+        break;
+      case 1:
+        if (yrot != 0) {
+          NuMtxRotateY(&m,(s32)yrot);
+        }
+        if (xrot != 0) {
+          NuMtxRotateX(&m,(s32)xrot);
+        }
+        if (zrot != 0) {
+          NuMtxRotateZ(&m,(s32)zrot);
+        }
+        break;
     }
     NuMtxTranslate(&m,pos);
     return NuRndrGScnObj(scn->gobjs[obj->instance->objid],&m);
   }
-  return i;
+  return 0;
 }
 
 //MATCH NGC
@@ -2045,7 +2042,6 @@ s32 Draw3DCharacter(struct nuvec_s *pos,u16 xrot,u16 yrot,u16 zrot,struct Charac
     s32 i;
     struct numtx_s m;
     struct nuvec_s s;
-    char pad[7];
 
     if ((model != 0) && (scale != 0.0f)) {
         if (Level != 0x25) {
@@ -2098,7 +2094,7 @@ s32 Draw3DCharacter(struct nuvec_s *pos,u16 xrot,u16 yrot,u16 zrot,struct Charac
                     break;
         }
         NuMtxTranslate(&m,pos);
-         if (((uint)action < 0x76) && (model->anmdata[action] != NULL)) {
+         if (((u32)action < 0x76) && (model->anmdata[action] != NULL)) {
             NuHGobjEvalAnim(model->hobj,model->anmdata[action],anim_time,0,NULL,tmtx);
         }
         else {
@@ -2491,13 +2487,13 @@ void UpdateMask(struct mask_s* mask, struct obj_s* obj) {
         v.x = (player->obj).pos.x;
         v.y = ((player->obj).bot + (player->obj).top) * (player->obj).SCALE * 0.5f + (player->obj).pos.y;
         v.z = (player->obj).pos.z;
-        AddVariableShotDebrisEffect(GDeb[620].i, &v, 1, 0, 0);
+        AddVariableShotDebrisEffect(GDeb[155].i, &v, 1, 0, 0);
     } else {
         if (1 < mask->active) {
             v.x = (mask->pos).x;
             v.y = (mask->pos).y;
             v.z = (mask->pos).z;
-            AddVariableShotDebrisEffect(GDeb[624].i, &v, 1, 0, 0);
+            AddVariableShotDebrisEffect(GDeb[156].i, &v, 1, 0, 0);
         }
     }
     if ((USELIGHTS != 0) && (LIGHTMASK != 0)) {
@@ -2915,36 +2911,37 @@ s32 AddAward(s32 hub,s32 level,u16 got) {
   s32 i;
   s32 j;
   s32 ang;
-  
+
   if (((hub != -1) && (level != -1)) && (HData[hub].i_spl[1] != -1)) {
     spl = SplTab[HData[hub].i_spl[1]].spl;
     if (spl == NULL) {
       return 0;
     }
     HubFromLevel(level);
-      i0 = temp_hublevel;
+    i0 = temp_hublevel;
     if (i0 == -1) {
-        return 0;
-    } else{
-        if ((got & 7) != 0) {
-           ang = 2;
-        } else if ((got & 8) != 0) {
-          ang = 1;
-        } else if ((got & 0x10) != 0) {
-          ang = 0;
-        } else{
-           ang = 3;
-        }
+      return 0;
+    }
+    {
+      if ((got & 7) != 0) {
+        ang = 2;
+      } else if ((got & 8) != 0) {
+        ang = 1;
+      } else if ((got & 0x10) != 0) {
+        ang = 0;
+      } else {
+        ang = 3;
+      }
       award = &Award[i_award];
-        i = ang * 2;
-      i +=  (i0 * 8); 
+      i = ang * 2;
+      i += i0 * 8;
       j = (i + 1);
       i *= spl->ptsize;
       j *= spl->ptsize;
-      p0 = (struct nuvec_s*)  &spl->pts[i];
+      p0 = (struct nuvec_s*) &spl->pts[i];
       p1 = (struct nuvec_s*) &spl->pts[j];
       award->time = 0.0f;
-      award->yrot = (u16) NuAtan2D(p1->x - p0->x,p1->z - p0->z);
+      award->yrot = (u16) NuAtan2D(p1->x - p0->x, p1->z - p0->z);
       award->level = (char)level;
       award->got = got;
       award->newpos = *p0;
@@ -2954,8 +2951,8 @@ s32 AddAward(s32 hub,s32 level,u16 got) {
         i_award = 0;
       }
     }
-  } else{
-      return 0;
+  } else {
+    return 0;
   }
   return 1;
 }
@@ -3267,32 +3264,29 @@ void DefaultTimeTrialNames(s32 all) {
   }
 }
 
-//87% NGC
+//NGC MATCH
 void NewLevelTime(s32 t) {
-    s32 i = 0;
-    s32 iVar6 = 0;
+    s32 i;
+    s32 j;
 
-    s32 time;
-
-    while (time = Game.level[Level].time[iVar6++].itime,
-            time != 0 && (t > time)) {
-        if (iVar6 > 2) {
-            newleveltime_slot = iVar6;
-            return;
+    i = 0;
+    while (i < 3 && Game.level[Level].time[i].itime != 0 && t > (s32)Game.level[Level].time[i].itime) {
+        i++;
+    }
+    if (i < 3) {
+        for (j = 2; j > i; j--) {
+            Game.level[Level].time[j] = Game.level[Level].time[j - 1];
+        }
+        Game.level[Level].time[i].itime = t;
+        strcpy(Game.level[Level].time[i].name, "___");
+        if (i < 2 && Game.level[Level].time[2].itime == 0) {
+            strcpy(Game.level[Level].time[2].name, PlaceName3[2][Game.language]);
+        }
+        if (i < 1 && Game.level[Level].time[1].itime == 0) {
+            strcpy(Game.level[Level].time[1].name, PlaceName3[1][Game.language]);
         }
     }
-    for (i = 2; i > iVar6; i--) {
-        Game.level[Level].time[i] = Game.level[Level].time[i - 1];
-    }
-    Game.level[Level].time[iVar6].itime = t;
-    strcpy(Game.level[Level].time[iVar6].name, "___");
-    if ((iVar6 < 2) && (Game.level[Level].time[2].itime == 0)) {
-        strcpy(Game.level[Level].time[2].name, PlaceName3[2][Game.language]);
-    }
-    if ((iVar6 < 1) && (Game.level[Level].time[1].itime == 0)) {
-        strcpy(Game.level[Level].time[1].name, PlaceName3[1][Game.language]);
-    }
-    newleveltime_slot = iVar6;
+    newleveltime_slot = i;
 }
 
 //NGC MATCH
@@ -6193,7 +6187,7 @@ void UpdateKabooms(void) {
                   }
                   wumpa->active = 0;
                   key = -1;
-                  AddFiniteShotDebrisEffect(&key,GDeb[520].i,&wumpa->pos,1);
+                  AddFiniteShotDebrisEffect(&key,GDeb[130].i,&wumpa->pos,1);
                 }
                 else {
                   FlyWumpa(wumpa);
@@ -7426,7 +7420,7 @@ typedef struct {
     s32* description;
 } PowerData;
 
-extern struct nupad_s* Pad[2];
+extern struct nupad_s* Pad[];
 extern struct game_s Game;
 extern struct game_s* game;
 extern s32 GameMode;
@@ -8288,7 +8282,7 @@ void DrawMenu(struct cursor_s *cursor,s32 paused) {
     }
 }
 
-//99% NGC
+//NGC MATCH
 void GameTiming(void) {
   s32 i;
   s32 tmp;
@@ -8326,7 +8320,7 @@ if  (Paused != 0) {
       if (force_panel_items_update != 0) {
         force_panel_items_update--;
       }
-      if (((Pad[0] != NULL) && ((Pad[0]->rdy & 0x10) != 0)) && (GameMode != 1)) {
+      if (((Pad[0] != NULL) && ((Pad[0]->paddata & 0x10) != 0)) && (GameMode != 1)) {
         force_panel_wumpa_update = 0x3c;
         if ((TimeTrial == 0) && (LDATA->hub != -1)) {
           force_panel_crate_update = 0x3c;
@@ -8386,10 +8380,10 @@ if  (Paused != 0) {
             }
       }
       tmp = 0;
-      if ((TimeTrial != 0) && ((player->obj).finished == '\x01')) {
-        tmp = 0x2c - (finish_frame % 0x3c); //(s32)(finish_frame % 0x3c < 0x2d);
+      if ((TimeTrial != 0) && ((player->obj).finished == 1)) {
+        tmp = (finish_frame % 60 > 44) ? 0 : (player->obj).finished;
       }
-        tt_flash = tmp;
+      tt_flash = tmp;
       if (advice_wait != 0) {
         advice_wait--;
       }
@@ -9050,7 +9044,7 @@ void DrawTarget(void) {
       return;
 }
 
-//95% NGC
+//85.32% NGC (scheduling/regswap)
 void DrawProbeFX(struct obj_s* obj) {
     s32 ang;
     struct nuvec_s vec;
@@ -9060,34 +9054,31 @@ void DrawProbeFX(struct obj_s* obj) {
 
     if (Paused == 0) {
         vec = obj->pos;
-        AddVariableShotDebrisEffect(GDeb[304].i, &vec, 1, -0x8000, 0);
+        AddVariableShotDebrisEffect(GDeb[76].i, &vec, 1, -0x8000, 0);
     }
     
     ang = obj->hdg + 3000;
     for (loop = 0; loop < 3; loop++) {
         vec = obj->pos;
+        vec1.y = vec.y;
+        vec.y -= 0.05f;
+        vec1.y -= 1.8f;
         vec2.x = (NuTrigTable[ang & 0xffff] * 0.48f);
         vec2.y = 0.0f;
         vec2.z = (NuTrigTable[(ang + 0x4000) & 0xffff] * 0.48f);
-        
         vec.x += vec2.x;
         vec.z += vec2.z;
-
-        
         vec1.x = vec.x + vec2.x;
-        vec1.y = vec.y - 1.8f;
-        vec.y -= 1.0f;
         vec1.z = vec.z + vec2.z;
         ang += 0x5555;
         
         if (Paused == 0) {
             NuLgtArcLaser(0, &vec1, &vec, &vec2, 0.1f, 0.1f, 0.01f, 0.3f, 0x80FF7F3F);
             NuLgtArcLaser(0, &vec1, &vec, &vec2, 0.4f, 0.3f, 0.001f, 0.3f, 0x80800040);
-            AddVariableShotDebrisEffect(GDeb[312].i, &vec1, 1, 0, 0);
-            AddVariableShotDebrisEffect(GDeb[312].i, &vec, 1, -0x8000, 0);
+            AddVariableShotDebrisEffect(GDeb[78].i, &vec1, 1, 0, 0);
+            AddVariableShotDebrisEffect(GDeb[78].i, &vec, 1, -0x8000, 0);
         }
     }
-    return;
 }
 
 //NGC MATCH

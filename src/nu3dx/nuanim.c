@@ -371,10 +371,10 @@ void NuAnimDataDestroy(struct nuanimdata_s *animdata) {
   }
 }
 
-//PS2 96%
+//NGC MATCH
 void NuAnimDataCalcTime(struct nuanimdata_s *animdata,float time,struct nuanimtime_s *atime)
 {
-    s32 iVar1;
+    s32 frame;
 
     if (time >= animdata->time) {
         atime->time = animdata->time - 0.01f;
@@ -392,24 +392,24 @@ void NuAnimDataCalcTime(struct nuanimdata_s *animdata,float time,struct nuanimti
     }
 
     atime->time_offset = atime->time - atime->chunk * 32;
-    iVar1 = floor(atime->time_offset);
-    iVar1--;
+    frame = floor(atime->time_offset);
 
-    atime->time_byte = (u8)(iVar1 / 8);
-    atime->time_mask = (u8)((1 << (iVar1 % 8 + 1)) - 1);
+    atime->time_byte = (u8)((frame - 1) / 8);
+    atime->time_mask = (u8)((1 << ((frame - 1) % 8 + 1)) - 1);
     return;
 }
 
+//NGC MATCH
 void NuAnimData2CalcTime(struct nuanimdata2_s *animdata,float time,struct nuanimtime_s *atime)
 {
-    s32 iVar1;
+    s32 frame;
 
     if (time >= animdata->endframe) {
         if (animdata->endframe == 1.0f) {
             atime->time = 1.0f;
-            atime->time_mask = 1;
-            atime->time_byte = 0;
             atime->chunk = 0;
+            atime->time_byte = 0;
+            atime->time_mask = 1;
             return;
         }
         atime->time = animdata->endframe - 0.01f;
@@ -427,15 +427,14 @@ void NuAnimData2CalcTime(struct nuanimdata2_s *animdata,float time,struct nuanim
     }
 
     atime->time_offset = atime->time - atime->chunk * 32;
-    iVar1 = (s32)atime->time_offset;
-    iVar1--;
+    frame = (s32)atime->time_offset;
 
-    atime->time_byte = (u8)(iVar1 / 8);
-    atime->time_mask = (u8)((1 << (iVar1 % 8) + 1) - 1);
+    atime->time_byte = (u8)((frame - 1) / 8);
+    atime->time_mask = (u8)((1 << ((frame - 1) % 8 + 1)) - 1);
     return;
 }
 
-//NGC 97%
+//NGC MATCH
 float NuAnimCurve2CalcVal(struct nuanimcurve2_s* animcurve, struct nuanimtime_s* atime, enum NUANIMKEYTYPES_e keytype)
 {
     u8 *mask;
@@ -493,7 +492,7 @@ float NuAnimCurve2CalcVal(struct nuanimcurve2_s* animcurve, struct nuanimtime_s*
             break;
     }
 
-    ixtmp = animcurve->data.curvedata->key_ixs[chunk_start_ix];
+    ixtmp = animcurve->data.curvedata->key_ixs[atime->chunk];
     switch(keytype) {
         case NUANIMKEYTYPE_NONE:
             NuErrorProlog("C:/source/crashwoc/code/nu3dx/nuanim.c",0xbbb)
@@ -502,14 +501,15 @@ float NuAnimCurve2CalcVal(struct nuanimcurve2_s* animcurve, struct nuanimtime_s*
         case NUANIMKEYTYPE_BIG:
             key = &((struct NUANIMKEYBIG_s *)animcurve->data.curvedata->key_array)[(s32)ixtmp + offset - 1];
             nextkey = &key[1];
-            if(atime->time > key->val  || atime->time < key->time){
+            if(atime->time > nextkey->time  || atime->time < key->time){
                 okdokey();
             }
-            val = key->val - nextkey->val;
-            fVar8 = key->grad * (nextkey->time - key->time);
-            dt = nextkey->grad * (nextkey->time - key->time);
+            dt = nextkey->time - key->time;
             time = (atime->time - key->time) * key->dtime;
-            return time * (time * (((time * (val + val + fVar8 + dt) + val * -3.0f) - (fVar8 + fVar8)) - dt) + fVar8) + key->val;
+            fVar8 = key->grad * dt;
+            fVar11 = nextkey->grad * dt;
+            val = key->val - nextkey->val;
+            return time * (time * (((time * (val + val + fVar8 + fVar11) + val * -3.0f) - (fVar8 + fVar8)) - fVar11) + fVar8) + key->val;
         case NUANIMKEYTYPE_SMALL:
             NuErrorProlog("C:/source/crashwoc/code/nu3dx/nuanim.c",0xbdd)
                 ("NuAnimCurve2CalcVal: not supporting NUANIMKEYTYPE_SMALL yet");

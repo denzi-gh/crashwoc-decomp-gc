@@ -33,9 +33,9 @@ void* NuScratchAlloc32(s32 size);
 void NuMemFree(void* data);
 
 // Allocate memory.
-void* malloc_x(s32 size);
+void* malloc_x(); // K&R style: every call site in the binary has crclr
 
 // Free memory.
-void free_x(void* data);
+void free_x(); // K&R style: every call site in the binary has crclr
 
 #endif // !NUMEM_H

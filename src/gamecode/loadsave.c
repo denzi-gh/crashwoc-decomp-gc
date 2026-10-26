@@ -15,7 +15,7 @@
 #include <string.h>
 
 struct _ULARGE_INTEGER {
-  unsigned long long QuadPart;
+  f64 QuadPart;
 };
 
 struct _FILETIME {
@@ -233,32 +233,32 @@ void DrawGameSlots(struct cursor_s *cursor) {
   DrawGameSlot(&SaveSlot[3],x + SLOTPANELDX,y - SLOTPANELDY,(sel != 3) ? 0 : col,(sel == 3) ? menu_pulsate * 0.6f : 0.6f);
 }
 
-//95% NGC
+//NGC MATCH
 void InitLoadSaveDeleteScreen(struct cursor_s *cur,s32 menu) {
   s32 i;
   s32 recent;
-  struct _SYSTEMTIME temp_time;
-  struct _FILETIME dVar5;
+  s32 x_val;
+  struct _ULARGE_INTEGER most_recent;
+  struct _ULARGE_INTEGER temp;
   struct _FILETIME file_time;
-  double dVar4;
+  struct _SYSTEMTIME temp_time;
   
   i = 0;
   memset(&temp_time,0,0x10);
   recent = -1;
-  dVar4 = 0.0;
+  most_recent.QuadPart = 0.0;
   for(; i < 4; i++) {
     if (SaveSlot[i].empty == 0) {
       temp_time.wYear = SaveSlot[i].year + 2000;
-      temp_time.wHour = (u16)SaveSlot[i].hours;
       temp_time.wMonth = (u16)SaveSlot[i].month;
       temp_time.wDay = (u16)SaveSlot[i].day;
+      temp_time.wHour = (u16)SaveSlot[i].hours;
       temp_time.wMinute = (u16)SaveSlot[i].mins;
       GetLastError();
-      *(u32 *)&dVar5 = *(u32 *)&file_time;
-      *((u32 *)&dVar5 + 1) = *((u32 *)&file_time + 1);
-      if (*(double *)&dVar5 > dVar4) {
+      memcpy(&temp, &file_time, sizeof(temp));
+      if (temp.QuadPart > most_recent.QuadPart) {
         recent = i;
-        dVar4 = *(double *)&dVar5;
+        most_recent.QuadPart = temp.QuadPart;
       }
     }
   }
@@ -267,8 +267,9 @@ void InitLoadSaveDeleteScreen(struct cursor_s *cur,s32 menu) {
     cur->remember[menu].y = 0;
   }
   else {
-    cur->remember[menu].x = (char)(recent / 2);
-    cur->remember[menu].y = (char)recent + cur->remember[menu].x;
+    x_val = recent / 2;
+    cur->remember[menu].x = (char)x_val;
+    cur->remember[menu].y = (char)(recent - (x_val + x_val));
   }
 }
 

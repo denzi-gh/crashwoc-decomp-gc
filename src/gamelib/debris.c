@@ -31,7 +31,10 @@ extern struct uv1deb *(*gensorttab[11])();
 extern void *gencodetab[7];
 
 struct DmaDebTypePointer;
+struct sceDmaTag;
 
+struct numtl_s *CreateAlphaBlendTexture256_32(char *fname, s32 uvmode, s32 alpha, s32 pri, s32 zmode);
+struct sceDmaTag *CreateDmaParticleSet(void *buffer, s32 *size);
 struct DmaDebTypePointer *CreateDmaPartEffectList(void *buffer, int *size);
 void GenericDebinfoDmaTypeUpdate(struct debinftype *debinfo);
 void LinkDmaParticalSets(int **table, int count);

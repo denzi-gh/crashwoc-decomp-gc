@@ -143,7 +143,7 @@ void NuLightFog(f32 pnear, f32 pfar, u32 colour, s32 blur, s32 haze);
 
 // NuLgtArcLaser
 
-// NuLgtArcLaserDraw
+void NuLgtArcLaserDraw(s32 paused);
 
 // NuLgtSetArcMat
 

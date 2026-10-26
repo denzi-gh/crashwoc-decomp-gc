@@ -942,51 +942,48 @@ void NuMtlAnimate(float timestep) {
 
 //NGC MATCH
 void NuMtlUVAnimation(struct nugobj_s* gobj) {
-    struct nugeom_s* geom_;
+    struct nugeom_s* geom;
     s32 numvts;
-    struct numtl_s* mtls;
-    struct nuvtx_tc1_s* vt1;
     float du;
     float dv;
-    int i;
+    struct nuvtx_tc1_s* vt1;
+    s32 i;
 
-    for (geom_ = gobj->geom; geom_ != NULL; geom_ = geom_->next) {
-        mtls = geom_->mtl;
-
-        if ((*(s32*)&mtls->K & 0xf0) == 0x20) {
-            du = mtls->du;
+    for (geom = gobj->geom; geom != NULL; geom = geom->next) {
+        if ((*(s32*)&geom->mtl->K & 0xf0) == 0x20) {
+            du = geom->mtl->du;
         } else {
-            if ((*(s32*)&mtls->K & 0xf) != 2)
+            if ((*(s32*)&geom->mtl->K & 0xf) != 2)
                 continue;
             du = 0.0f;
         }
-        if ((*(s32*)&mtls->K & 0xf) == 2) {
-            dv = mtls->dv;
+        if ((*(s32*)&geom->mtl->K & 0xf) == 2) {
+            dv = geom->mtl->dv;
         } else {
             dv = 0.0f;
         }
 
         if ((dv != 0.0f) && (du != 0.0f)) {
-            if (geom_->vtxtype == NUVT_TC1) {
-                numvts = geom_->vtxcnt;
-                vt1 = (struct nuvtx_tc1_s*)geom_->hVB;
+            if (geom->vtxtype == NUVT_TC1) {
+                numvts = geom->vtxcnt;
+                vt1 = (struct nuvtx_tc1_s*)geom->hVB;
                 for (i = 0; i < numvts; i++) {
                     vt1[i].tc[0] = vt1[i].tc[0] + du + du;
                     vt1[i].tc[1] = vt1[i].tc[1] + dv + dv;
                 }
             }
         } else if ((dv == 0.0f) && (du != 0.0f)) {
-            if ((geom_->vtxtype == NUVT_TC1)) {
-                numvts = geom_->vtxcnt;
-                vt1 = (struct nuvtx_tc1_s*)geom_->hVB;
+            if ((geom->vtxtype == NUVT_TC1)) {
+                numvts = geom->vtxcnt;
+                vt1 = (struct nuvtx_tc1_s*)geom->hVB;
                 for (i = 0; i < numvts; i++) {
                     vt1[i].tc[0] = vt1[i].tc[0] + du + du;
                 }
             }
         } else if ((dv != 0.0f) && (du == 0.0f)) {
-            if (geom_->vtxtype == NUVT_TC1) {
-                numvts = geom_->vtxcnt;
-                vt1 = (struct nuvtx_tc1_s*)geom_->hVB;
+            if (geom->vtxtype == NUVT_TC1) {
+                numvts = geom->vtxcnt;
+                vt1 = (struct nuvtx_tc1_s*)geom->hVB;
                 for (i = 0; i < numvts; i++) {
                     vt1[i].tc[1] = vt1[i].tc[1] + dv + dv;
                 }

@@ -24,7 +24,7 @@ struct object_path_s {
     s32 trigger_id;
     f32 trigger_var;
     f32 trigger_wait;
-    char particle_name[16][8];
+    char particle_name[8][16];
     s32 particle_type[8];
     s32 particle_rate[8];
     s32 particle_switch[8];
@@ -32,7 +32,7 @@ struct object_path_s {
     s16 particle_emitrotz[8];
     s16 particle_emitroty[8];
     f32 sound_last_time;
-    char sound_name[16][8];
+    char sound_name[8][16];
     s32 sound_id[8];
     s32 sound_type[8];
     f32 sound_time[8];

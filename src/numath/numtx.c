@@ -760,105 +760,105 @@ void NuMtxCalcDebrisFaceOn(struct Mtx* m)
 }
 
 
-//80%
-void NuMtxInvH(struct numtx_s *mi,struct numtx_s *m0) {
-    int cnt;
-    int iVar4;
-    int iVar5;
-    int iVar9;
-
-    double a [4] [4];
+//MATCH GCN
+void NuMtxInvH(struct numtx_s *mi, struct numtx_s *m0)
+{
+    double a[4][4];
     int i;
     int j;
-    int p [4];
-    double dVar10;
-    double uVar12;
-    double uVar13;
-    double dVar12;
-    double dVar13;
-    double dVar14;
-    char bVar1;
-    
-    a[0][0] = (double)m0->_00;
-    a[0][1] = (double)m0->_01;
-    a[0][2] = (double)m0->_02;
-    a[0][3] = (double)m0->_03;
-    a[1][0] = (double)m0->_10;
-    a[1][1] = (double)m0->_11;
-    a[1][2] = (double)m0->_12;
-    a[1][3] = (double)m0->_13;
-    a[2][0] = (double)m0->_20;
-    a[2][1] = (double)m0->_21;
-    a[2][2] = (double)m0->_22;
-    a[2][3] = (double)m0->_23;
-    a[3][0] = (double)m0->_30;
-    a[3][1] = (double)m0->_31;
-    a[3][2] = (double)m0->_32;
-    a[3][3] = (double)m0->_33;
-    
-    for(iVar4 = 0; iVar4 < 4; iVar4++ ) {
-        p[iVar4] = 0;
-        dVar12 = 0.0;
-        for (iVar5 = iVar4; iVar5 < 4; iVar5++) {
-            dVar13 = 0.0;
-            for (i = 0; i < 4; i++) {
-                dVar10 = NuFabs((float)a[iVar5][i]);
-                dVar13 += dVar10;
-            } 
-            dVar10 = (double)NuFabs((double)(float)a[iVar5][iVar4]);
-            if (dVar12 < dVar10 / dVar13) {
-                p[iVar4] = iVar5;
-                dVar12 = dVar10 / dVar13;
+    int k;
+    int p[4];
+    double h;
+    double q;
+    double s;
+    double sup;
+    double pivot;
+    int n;
+
+    n = 4;
+    a[0][0] = m0->_00;
+    a[0][1] = m0->_01;
+    a[0][2] = m0->_02;
+    a[0][3] = m0->_03;
+    a[1][0] = m0->_10;
+    a[1][1] = m0->_11;
+    a[1][2] = m0->_12;
+    a[1][3] = m0->_13;
+    a[2][0] = m0->_20;
+    a[2][1] = m0->_21;
+    a[2][2] = m0->_22;
+    a[2][3] = m0->_23;
+    a[3][0] = m0->_30;
+    a[3][1] = m0->_31;
+    a[3][2] = m0->_32;
+    a[3][3] = m0->_33;
+
+    for (i = 0; i < n; i++) {
+        sup = 0.0;
+        p[i] = 0;
+        for (j = i; j < n; j++) {
+            s = 0.0;
+            for (k = i; k < n; k++) {
+                q = NuFabs(a[j][k]);
+                s += q;
+            }
+            q = NuFabs(a[j][i]) / s;
+            if (sup < q) {
+                p[i] = j;
+                sup = q;
             }
         }
-        if (dVar12 == 0.0) break;
-        if (p[iVar4] != iVar4) {
-            for (j = 0; j < 4; j++) {
-                uVar12 = a[iVar4][j];
-                a[iVar4][j] = a[p[iVar4]][j];
-                a[p[iVar4]][j] = uVar12;
+        if (sup == 0.0) {
+            return;
+        }
+        if (p[i] != i) {
+            for (k = 0; k < n; k++) {
+                h = a[i][k];
+                a[i][k] = a[p[i]][k];
+                a[p[i]][k] = h;
             }
         }
-        dVar14 = a[iVar4][iVar4];
-        for (i = 0; i < 4; i++) {
-            if (i != iVar4) {
-                a[iVar4][i] = -a[iVar4][i] / dVar14;
-                for (iVar9 = 0; iVar9 < 4; iVar9++) {
-                    if (iVar9 != iVar4) {
-                        a[iVar9][i] += a[iVar9][iVar4] * a[iVar4][i];
+        pivot = a[i][i];
+        for (k = 0; k < n; k++) {
+            if (k != i) {
+                a[i][k] = -a[i][k] / pivot;
+                for (j = 0; j < n; j++) {
+                    if (j != i) {
+                        a[j][k] += a[j][i] * a[i][k];
                     }
                 }
             }
-        } 
-        for (cnt = 0; cnt < 4; cnt++) {
-            a[cnt][iVar4] = a[cnt][iVar4] / dVar14;
         }
-        a[iVar4][iVar4] = 1.0 / dVar14;
+        for (j = 0; j < n; j++) {
+            a[j][i] = a[j][i] / pivot;
+        }
+        a[i][i] = 1.0 / pivot;
     }
-    
-    for (iVar4 = 4; iVar4 >= 0; iVar4--) {
-        if (p[iVar4] != iVar4) {
-            for (j = 0; j < 4; j++) {
-                uVar13 = a[j][iVar4];
-                a[j][iVar4] = a[j][p[iVar4]];
-                a[j][p[iVar4]] = uVar13;
-            } 
+
+    for (i = n - 1; i >= 0; i--) {
+        if (p[i] != i) {
+            for (j = 0; j < n; j++) {
+                h = a[j][i];
+                a[j][i] = a[j][p[i]];
+                a[j][p[i]] = h;
+            }
         }
-    } 
-    mi->_00 = (float)a[0][0];
-    mi->_01 = (float)a[0][1];
-    mi->_02 = (float)a[0][2];
-    mi->_03 = (float)a[0][3];
-    mi->_10 = (float)a[1][0];
-    mi->_11 = (float)a[1][1];
-    mi->_12 = (float)a[1][2];
-    mi->_13 = (float)a[1][3];
-    mi->_20 = (float)a[2][0];
-    mi->_21 = (float)a[2][1];
-    mi->_22 = (float)a[2][2];
-    mi->_23 = (float)a[2][3];
-    mi->_30 = (float)a[3][0];
-    mi->_31 = (float)a[3][1];
-    mi->_32 = (float)a[3][2];
-    mi->_33 = (float)a[3][3];
+    }
+
+    mi->_00 = a[0][0];
+    mi->_01 = a[0][1];
+    mi->_02 = a[0][2];
+    mi->_03 = a[0][3];
+    mi->_10 = a[1][0];
+    mi->_11 = a[1][1];
+    mi->_12 = a[1][2];
+    mi->_13 = a[1][3];
+    mi->_20 = a[2][0];
+    mi->_21 = a[2][1];
+    mi->_22 = a[2][2];
+    mi->_23 = a[2][3];
+    mi->_30 = a[3][0];
+    mi->_31 = a[3][1];
+    mi->_32 = a[3][2];
+    mi->_33 = a[3][3];
 }

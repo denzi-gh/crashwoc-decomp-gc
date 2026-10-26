@@ -860,7 +860,7 @@ float GameObjectRadius(struct obj_s *obj) {
   return r;
 }
 
-//NGC 99% (regswap)
+//NGC MATCH
 s32 CylinderCuboidOverlapXZ(struct nuvec_s* pos, float radius, struct obj_s* cub, struct nuvec_s* cub_pos) {
     struct nuvec_s vNew;
     float x0;  // f5
@@ -949,16 +949,18 @@ s32 CylinderCuboidOverlapXZ(struct nuvec_s* pos, float radius, struct obj_s* cub
     
     
     if ((vNew.x - x0) < (x1 - vNew.x)) {
+        dx = vNew.x - x0;
         if ((vNew.z - z0) < (z1 - vNew.z)) {
-            corner = ((vNew.z - z0) < (vNew.x - x0)) ? 0x8000 : 0xC000;
+            corner = ((vNew.z - z0) < dx) ? 0x8000 : 0xC000;
         } else {
-            corner = ((z1 - vNew.z) < (vNew.x - x0)) ? 0 : 0xC000;
+            corner = ((z1 - vNew.z) < dx) ? 0 : 0xC000;
         }
     } else {
+        dx = x1 - vNew.x;
         if ((vNew.z - z0) < (z1 - vNew.z)) {
-            corner = ((vNew.z - z0) < (x1 - vNew.x)) ? 0x8000 : 0x4000;
+            corner = ((vNew.z - z0) < dx) ? 0x8000 : 0x4000;
         } else {
-            corner = ((z1 - vNew.z) < (x1 - vNew.x)) ? 0 : 0x4000;
+            corner = ((z1 - vNew.z) < dx) ? 0 : 0x4000;
         }
     }
     

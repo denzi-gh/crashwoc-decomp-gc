@@ -340,7 +340,7 @@ void NuLgtArcLaser(s32 type,struct nuvec_s *start,struct nuvec_s *target,struct 
     return;
 }
 
-//94% NGC (compiler scheduling/regalloc differences)
+//MATCH NGC
 void NuLgtArcLaserDraw(s32 paused)
 {
   s32 id;
@@ -354,9 +354,6 @@ void NuLgtArcLaserDraw(s32 paused)
   float rhw2;
   float lp;
   float step;
-  float len;
-  float next;
-  float arcscale;
   float rx;
   float ry;
   float u0_2;
@@ -391,6 +388,8 @@ void NuLgtArcLaserDraw(s32 paused)
         if (!(0.5f <= pnts[5].w)) {
           continue;
         }
+      }
+      if (pnts[4].w < 0.5f) {
         pnts[6].x = NuLgtArcLaserData[id].target.x + (((NuLgtArcLaserData[id].start.x - NuLgtArcLaserData[id].target.x) * (pnts[5].w - 0.5f)) / (pnts[5].w - pnts[4].w));
         pnts[6].y = NuLgtArcLaserData[id].target.y + (((NuLgtArcLaserData[id].start.y - NuLgtArcLaserData[id].target.y) * (pnts[5].w - 0.5f)) / (pnts[5].w - pnts[4].w));
         pnts[6].z = NuLgtArcLaserData[id].target.z + (((NuLgtArcLaserData[id].start.z - NuLgtArcLaserData[id].target.z) * (pnts[5].w - 0.5f)) / (pnts[5].w - pnts[4].w));
@@ -417,7 +416,6 @@ void NuLgtArcLaserDraw(s32 paused)
       NuVec4Scale(&pnts[4], &pnts[4], 1.0f / pnts[4].w);
       NuVec4MtxTransformVU0(&pnts[5], &pnts[7], vpcsmtx);
       NuVec4Scale(&pnts[5], &pnts[5], 1.0f / pnts[5].w);
-      lp = 0.0f;
       norm.x = (pnts[5].y - pnts[4].y) * (((float)SWIDTH) / 240.0f);
       norm.y = pnts[4].x - pnts[5].x;
       norm.z = 0.0f;
@@ -428,21 +426,21 @@ void NuLgtArcLaserDraw(s32 paused)
       pnts[7].y = pnts[7].y - pnts[6].y;
       pnts[7].z = pnts[7].z - pnts[6].z;
       pnts[7].w = pnts[7].w - pnts[6].w;
-      len = sqrt(POW2(pnts[7].x) + POW2(pnts[7].y) + POW2(pnts[7].z));
-      if (0.0f < len) {
+      step = sqrt(POW2(pnts[7].x) + POW2(pnts[7].y) + POW2(pnts[7].z));
+      if (0.0f < step) {
 
         pnts[10].x = NuLgtArcLaserData[id].lasdir.x;
         pnts[10].y = NuLgtArcLaserData[id].lasdir.y;
         pnts[10].z = NuLgtArcLaserData[id].lasdir.z;
-        arcscale = POW2(pnts[10].x) + POW2(pnts[10].y) + POW2(pnts[10].z);
-        if (arcscale > 0.0f) {
-          arcscale = NuLgtArcLaserData[id].arcsize / NuFsqrt(arcscale);
+        rhw = POW2(pnts[10].x) + POW2(pnts[10].y) + POW2(pnts[10].z);
+        if (rhw > 0.0f) {
+          rhw = NuLgtArcLaserData[id].arcsize / NuFsqrt(rhw);
         }
-        pnts[10].x = pnts[10].x * arcscale;
-        pnts[10].y = pnts[10].y * arcscale;
-        pnts[10].z = pnts[10].z * arcscale;
+        pnts[10].x = pnts[10].x * rhw;
+        pnts[10].y = pnts[10].y * rhw;
+        pnts[10].z = pnts[10].z * rhw;
         NuLgtSeed = NuLgtArcLaserData[id].seed;
-        step = NuLgtArcLaserData[id].sizel / len;
+        step = NuLgtArcLaserData[id].sizel / step;
         if (step > 1.0f) {
           step = 1.0f;
         }
@@ -465,9 +463,8 @@ void NuLgtArcLaserDraw(s32 paused)
         pnts[3].x = pnts[4].x;
         pnts[3].y = pnts[4].y;
         pnts[3].z = pnts[4].z;
-        for (; lp < 1.0f; lp = next) {
-          next = lp + step;
-          if (next >= 1.0f) {
+        for (lp = 0.0f; lp < 1.0f; lp += step) {
+          if ((lp + step) >= 1.0f) {
             pnts[5].x = pnts[6].x + pnts[7].x;
             pnts[5].y = pnts[6].y + pnts[7].y;
             pnts[5].z = pnts[6].z + pnts[7].z;
@@ -475,9 +472,9 @@ void NuLgtArcLaserDraw(s32 paused)
             uv[0].z = u0_2;
             uv[0].x = u0_2;
           } else {
-            pnts[5].x = (pnts[10].x * NuTrigTable[(u16)next]) + ((pnts[7].x * next) + pnts[6].x);
-            pnts[5].y = (pnts[10].y * NuTrigTable[(u16)next]) + ((pnts[7].y * next) + pnts[6].y);
-            pnts[5].z = (pnts[10].z * NuTrigTable[(u16)next]) + ((pnts[7].z * next) + pnts[6].z);
+            pnts[5].x = (pnts[10].x * NuTrigTable[(u16)(lp + step)]) + ((pnts[7].x * (lp + step)) + pnts[6].x);
+            pnts[5].y = (pnts[10].y * NuTrigTable[(u16)(lp + step)]) + ((pnts[7].y * (lp + step)) + pnts[6].y);
+            pnts[5].z = (pnts[10].z * NuTrigTable[(u16)(lp + step)]) + ((pnts[7].z * (lp + step)) + pnts[6].z);
           }
           pnts[5].w = 1.0f;
           NuVec4MtxTransformVU0(&pnts[5], &pnts[5], vpcsmtx);
@@ -485,8 +482,9 @@ void NuLgtArcLaserDraw(s32 paused)
           NuVec4Scale(&pnts[5], &pnts[5], rhw2);
           if ((lp < (1.0f - (step * 1.5f))) && (NuLgtSeed != 0)) {
             rnd = NuLgtRand();
-            rx = ((norm.x * (rnd - 0x80)) * NuLgtArcLaserData[id].sizewob) * rhw2;
-            ry = ((norm.y * (rnd - 0x80)) * NuLgtArcLaserData[id].sizewob) * rhw2;
+            ry = rnd - 0x80;
+            rx = ((norm.x * ry) * NuLgtArcLaserData[id].sizewob) * rhw2;
+            ry = ((norm.y * ry) * NuLgtArcLaserData[id].sizewob) * rhw2;
           } else {
             ry = 0.0f;
             rx = ry;
@@ -503,8 +501,9 @@ void NuLgtArcLaserDraw(s32 paused)
               (!(pnts[0].x > 700.0f) || !(pnts[1].x > 700.0f)) &&
               (!(pnts[0].y < -50.0f) || !(pnts[1].y < -50.0f)) &&
               (!(pnts[0].y > 530.0f) || !(pnts[1].y > 530.0f))) {
-            dxpnts[0].rhw = dxpnts[1].rhw = dxpnts[2].rhw = 0.1f;
-            dxpnts[0].diffuse = dxpnts[1].diffuse = dxpnts[2].diffuse = NuLgtArcLaserData[id].col;
+            dxpnts[0].diffuse = NuLgtArcLaserData[id].col;
+            dxpnts[1].diffuse = NuLgtArcLaserData[id].col;
+            dxpnts[2].diffuse = NuLgtArcLaserData[id].col;
             dxpnts[0].pnt.x = pnts[0].x;
             dxpnts[0].pnt.y = pnts[0].y;
             dxpnts[0].pnt.z = pnts[0].z;
@@ -518,10 +517,12 @@ void NuLgtArcLaserDraw(s32 paused)
             dxpnts[0].tc[1] = uv[1].x;
             dxpnts[1].tc[0] = uv[0].y;
             dxpnts[1].tc[1] = uv[1].y;
+            dxpnts[0].rhw = 0.1f;
+            dxpnts[1].rhw = 0.1f;
+            dxpnts[2].rhw = 0.1f;
             dxpnts[2].tc[0] = uv[0].z;
             dxpnts[2].tc[1] = uv[1].z;
             NuRndrTri2d(dxpnts, NuLgtArcMtl);
-            dxpnts[0].rhw = dxpnts[1].rhw = dxpnts[2].rhw = 0.1f;
             dxpnts[0].pnt.x = pnts[1].x;
             dxpnts[0].pnt.y = pnts[1].y;
             dxpnts[0].pnt.z = pnts[1].z;
@@ -537,6 +538,9 @@ void NuLgtArcLaserDraw(s32 paused)
             dxpnts[1].tc[1] = uv[1].w;
             dxpnts[2].tc[0] = uv[0].z;
             dxpnts[2].tc[1] = uv[1].z;
+            dxpnts[0].rhw = 0.1f;
+            dxpnts[1].rhw = 0.1f;
+            dxpnts[2].rhw = 0.1f;
             NuRndrTri2d(dxpnts, NuLgtArcMtl);
           }
           pnts[1].x = pnts[0].x;

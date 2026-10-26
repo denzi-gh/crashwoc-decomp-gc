@@ -106,7 +106,7 @@ void NuRndrSwapScreen(s32 hRT) {
     return;
 }
 
-//96% NGC
+//NGC MATCH
 s32 NuRndrGobj(struct nugobj_s* gobj, struct numtx_s* wm, f32** blendvals) {
     struct nugeomitem_s* item;
     struct nufaceongeom_s* facegeom;
@@ -166,8 +166,8 @@ s32 NuRndrGobj(struct nugobj_s* gobj, struct numtx_s* wm, f32** blendvals) {
                 NuErrorProlog("C:/source/crashwoc/code/nu3dx/nurndr.c", 0x282)("NuRndrGobj : No free matrix slots!");
             }
 
-            mtx = rndrmtx;
-            mtx[rndrmtx_cnt] = *wm;
+            mtx = &rndrmtx[rndrmtx_cnt];
+            *mtx = *wm;
 
             if (split != 0) {
                 NuMtxSetIdentity(&premtx);
@@ -215,25 +215,27 @@ s32 NuRndrGobj(struct nugobj_s* gobj, struct numtx_s* wm, f32** blendvals) {
             }
 
             facegeom = gobj->faceon_geom;
-            if (facegeom != NULL) {
-                if (geomitem_cnt != 0) {
-                    geomitem_cnt--;
-                    item = &geomitem[geomitem_cnt];
-                    item->geom = (struct nugeom_s *)facegeom;
-                    item->hdr.lights_index = NuLightStoreCurrentLights();
-                    item->hdr.type = NURNDRITEM_GEOMFACE;
-                    item->hdr.flags = 0;
-                    if (outcode == 1) {
-                        item->hdr.flags = 1;
+            do {
+                if (facegeom != NULL) {
+                    if (geomitem_cnt != 0) {
+                        geomitem_cnt--;
+                        item = &geomitem[geomitem_cnt];
+                        item->geom = (struct nugeom_s *)facegeom;
+                        item->hdr.lights_index = NuLightStoreCurrentLights();
+                        item->hdr.type = NURNDRITEM_GEOMFACE;
+                        item->hdr.flags = 0;
+                        if (outcode == 1) {
+                            item->hdr.flags = 1;
+                        }
+                        item->mtx = mtx;
+                        item->blendvals = blendvals;
+                        NuMtlAddFaceonItem(facegeom->mtl, &item->hdr);
                     }
-                    item->mtx = mtx;
-                    item->blendvals = blendvals;
-                    NuMtlAddFaceonItem(facegeom->mtl, &item->hdr);
+                    else {
+                        NuErrorProlog("C:/source/crashwoc/code/nu3dx/nurndr.c", 0x2dc)("NuRndrGobj : No free geom item slots!");
+                    }
                 }
-                else {
-                    NuErrorProlog("C:/source/crashwoc/code/nu3dx/nurndr.c", 0x2dc)("NuRndrGobj : No free geom item slots!");
-                }
-            }
+            } while (0);
         }
     }
 
@@ -702,8 +704,8 @@ static void NuRndrBlendedSkinItem(struct nugeomitem_s* item) {
   blendgeom = item->geom->blendgeom;
   DBTimerStart(4);
   DBTimerStart(0xd);
-  //PPCMtmmcr0(0x8b);
-  //PPCMtmmcr1(0x78400000);
+  PPCMtmmcr0(0x8b);
+  PPCMtmmcr1(0x78400000);
   geom = item->geom;
   srcverts = (struct nuvtx_sk3tc1_s *)geom->hVB;
   destvb = (struct nuvec_s *)geom->blendgeom->hVB;
@@ -717,16 +719,16 @@ static void NuRndrBlendedSkinItem(struct nugeomitem_s* item) {
             blendval = (*item->blendvals)[blendgeom->ix[j]];
             if (blendval != 0.0f) {
                 destvb->x = LCBlendOffsets[i].x * blendval + destvb->x;
-                destvb->y = LCBlendOffsets[i].y * blendval + destvb->y;
-                destvb->z = LCBlendOffsets[i].z * blendval + destvb->z;
+                destvb->y = blendgeom->blend_offsets[j][i].y * blendval + destvb->y;
+                destvb->z = blendgeom->blend_offsets[j][i].z * blendval + destvb->z;
                 }
             }
         }
       destvb = destvb + 1;
       srcverts = srcverts + 1;
     }
-  //PPCMtmmcr1(0);
-  //PPCMtmmcr0(0);
+  PPCMtmmcr1(0);
+  PPCMtmmcr0(0);
   DBTimerEnd(0xd);
   SetupShaders(item);
   GS_LoadWorldMatrixIdentity();
@@ -772,11 +774,11 @@ void NuRndrSkinItem2(struct nugeomitem_s *item) {
 
 //MATCH GCN
 void NuRndrAnglesZX(struct nuvec_s *src,struct nuvec_s *rot) {
-  struct nuvec_s v[2];
+  struct nuvec_s v;
 
   rot->x = (float)NuAtan2D(src->z,src->y);
-  NuVecRotateX(&v[0],src,(s32)-rot->x);
-  rot->z = (float)-NuAtan2D(v[0].x,v[0].y);
+  NuVecRotateX(&v,src,(s32)-rot->x);
+  rot->z = (float)-NuAtan2D(v.x,v.y);
   return;
 }
 
@@ -883,47 +885,47 @@ void NuRndrAddFootPrint(s32 rot,float sizex,float sizez,s32 brightness,struct nu
 }
 
 
-//86% GCN
+//MATCH GCN
 void NuRndrFootPrints(struct numtl_s *mtl,float *u,float *v) {
     s32 cnt;
-    s32 lp, cnt2;
+    s32 lp;
     struct nuvtx_tc1_s *vp [4];
-    static struct nuvtx_tc1_s vtx_247[256][4]; //nuvtx_tc1_s vtx[2048];
+    static struct nuvtx_tc1_s vtx_247[2048];
 
     for (lp = 0, cnt = 0; lp < 0x40; lp++) {
         if (NuRndrFootData[lp].timer > 0) {
             if (NuRndrFootData[lp].timer < 16) {
                 NuRndrFootData[lp].timer--;
             }
+            vtx_247[cnt + 0].pnt = NuRndrFootData[lp].pnts[0];
+            vtx_247[cnt + 0].tc[0] = u[NuRndrFootData[lp].gfx];
+            vtx_247[cnt + 0].tc[1] = v[NuRndrFootData[lp].gfx];
+
+            vtx_247[cnt + 1].pnt = NuRndrFootData[lp].pnts[1];
+            vtx_247[cnt + 1].tc[0] = u[NuRndrFootData[lp].gfx + 1];
+            vtx_247[cnt + 1].tc[1] = v[NuRndrFootData[lp].gfx + 1];
+
+            vtx_247[cnt + 2].pnt = NuRndrFootData[lp].pnts[2];
+            vtx_247[cnt + 2].tc[0] = u[NuRndrFootData[lp].gfx + 2];
+            vtx_247[cnt + 2].tc[1] = v[NuRndrFootData[lp].gfx + 2];
+
+            vtx_247[cnt + 3].pnt = NuRndrFootData[lp].pnts[3];
+            vtx_247[cnt + 3].tc[0] = u[NuRndrFootData[lp].gfx + 3];
+            vtx_247[cnt + 3].tc[1] =  v[NuRndrFootData[lp].gfx + 3];
+
+            vtx_247[cnt + 3].diffuse = (NuRndrFootData[lp].brightness * NuRndrFootData[lp].timer * 0x100000 & 0xff000000U) + 0x808080;
+            vtx_247[cnt + 2].diffuse = (NuRndrFootData[lp].brightness * NuRndrFootData[lp].timer * 0x100000 & 0xff000000U) + 0x808080;
+            vtx_247[cnt + 1].diffuse = (NuRndrFootData[lp].brightness * NuRndrFootData[lp].timer * 0x100000 & 0xff000000U) + 0x808080;
+            vtx_247[cnt + 0].diffuse = (NuRndrFootData[lp].brightness * NuRndrFootData[lp].timer * 0x100000 & 0xff000000U) + 0x808080;
             cnt += 4;
-            vtx_247[lp][0].pnt = NuRndrFootData[lp].pnts[0];
-            vtx_247[lp][0].tc[0] = u[NuRndrFootData[lp].gfx];
-            vtx_247[lp][0].tc[1] = v[NuRndrFootData[lp].gfx];
-
-            vtx_247[lp][1].pnt = NuRndrFootData[lp].pnts[1];
-            vtx_247[lp][1].tc[0] = u[NuRndrFootData[lp].gfx + 1];
-            vtx_247[lp][1].tc[1] = v[NuRndrFootData[lp].gfx + 1];
-
-            vtx_247[lp][2].pnt = NuRndrFootData[lp].pnts[2];
-            vtx_247[lp][2].tc[0] = u[NuRndrFootData[lp].gfx + 2];
-            vtx_247[lp][2].tc[1] = v[NuRndrFootData[lp].gfx + 2];
-
-            vtx_247[lp][3].pnt = NuRndrFootData[lp].pnts[3];
-            vtx_247[lp][3].tc[0] = u[NuRndrFootData[lp].gfx + 3];
-            vtx_247[lp][3].tc[1] =  v[NuRndrFootData[lp].gfx + 3];
-
-            vtx_247[lp][3].diffuse = (NuRndrFootData[lp].timer * NuRndrFootData[lp].brightness * 0x100000 & 0xff000000U) + 0x808080;
-            vtx_247[lp][2].diffuse = (NuRndrFootData[lp].timer * NuRndrFootData[lp].brightness * 0x100000 & 0xff000000U) + 0x808080;
-            vtx_247[lp][1].diffuse = (NuRndrFootData[lp].timer * NuRndrFootData[lp].brightness * 0x100000 & 0xff000000U) + 0x808080;
-            vtx_247[lp][0].diffuse = (NuRndrFootData[lp].timer * NuRndrFootData[lp].brightness * 0x100000 & 0xff000000U) + 0x808080;
         }
     }
     if (cnt != 0) {
-        for (lp = 0, cnt2=0; cnt2 < cnt; lp++, cnt2+=4) {
-            vp[0] = &vtx_247[lp][0];
-            vp[1] = &vtx_247[lp][1];
-            vp[2] = &vtx_247[lp][2];
-            vp[3] = &vtx_247[lp][3];
+        for (lp = 0; lp < cnt; lp += 4) {
+            vp[0] = &vtx_247[lp + 0];
+            vp[1] = &vtx_247[lp + 1];
+            vp[2] = &vtx_247[lp + 2];
+            vp[3] = &vtx_247[lp + 3];
             NuRndrStrip3d(vp,mtl,0,4);
         }
     }
@@ -970,131 +972,109 @@ void NuRndrInitWorld(void) {
 
 //MATCH GCN
 void NuRndrFx(s32 paused,struct nuvec_s *playerpos) {
-  //NuLgtArcLaserDraw(paused);
+  NuLgtArcLaserDraw(paused);
   return;
 }
 
 static struct nuvtx_tc1_s vtx_263[2048];
 
-//40% GCN
-void NuRndrTrail(s32 trailpt,struct trail_s *trail,s32 TRAILCOUNT) {
-    s32 uVar2;
-    s32 uVar5;
-    s32 iVar6;
-    s32 unaff_r15;
-    s32 iVar8;
-    s32 uVar9;
-    s32 iVar10;
-    s32 iVar11;
-    s32 iVar12;
-    s32 iVar13;
+//NGC MATCH
+void NuRndrTrail(int trailpt, struct trail_s *trail, int TRAILCOUNT) {
+    struct nuvtx_tc1_s *vp[4];
+    int loop;
+    int cnt;
+    int start;
+    int ls;
+    int le;
+    int Last;
+    int Begin;
+    int end;
 
-    s32 cnt;
-    s32 loop;
-    struct nuvtx_tc1_s *vp [4];
-
-
-    //loop = (trailpt + 1) - TRAILCOUNT;
-    iVar8 = 0;
-        //uVar7 = TRAILCOUNT - 1;
-        iVar12 = 0x6c;
-        iVar13 = 0x48;
-        iVar10 = 0x24;
-        iVar11 = 0;
-        uVar2 = -1;
-        for (cnt = 0; cnt < (trailpt + 1) - TRAILCOUNT; cnt++) {
-            uVar9 = trailpt & TRAILCOUNT - 1;
-            if (trail[uVar9].pos1.x != -10000.0f) {
-                uVar9 = -1;
+    cnt = 0;
+    Last = -1;
+    start = trailpt + (1 - TRAILCOUNT);
+    for (loop = trailpt; loop > trailpt + (1 - TRAILCOUNT); loop--) {
+        end = loop & (TRAILCOUNT - 1);
+        if (trail[end].pos1.x != -10000.0f) {
+            if (Last != -1) {
+                ls = le;
+                le = trail[end].intensity;
+                {
+                    int Next = (loop - 1) & (TRAILCOUNT - 1);
+                    int Next2 = (loop - 2) & (TRAILCOUNT - 1);
+                    if (trail[Next].pos1.x == -10000.0f || loop - 1 <= start) {
+                        le = 0;
+                    } else if (trail[Next2].pos1.x == -10000.0f || Begin) {
+                        le = ((le >> 24) / 2) << 24;
+                    }
+                }
+                Begin = 0;
+                vtx_263[cnt].pnt = trail[Last].pos1;
+                vtx_263[cnt + 1].pnt = trail[end].pos1;
+                vtx_263[cnt + 2].pnt.x = (trail[Last].pos2.x - trail[Last].pos1.x) * 0.25f + trail[Last].pos1.x;
+                vtx_263[cnt + 2].pnt.y = (trail[Last].pos2.y - trail[Last].pos1.y) * 0.25f + trail[Last].pos1.y;
+                vtx_263[cnt + 2].pnt.z = (trail[Last].pos2.z - trail[Last].pos1.z) * 0.25f + trail[Last].pos1.z;
+                vtx_263[cnt + 3].pnt.x = (trail[end].pos2.x - trail[end].pos1.x) * 0.25f + trail[end].pos1.x;
+                vtx_263[cnt + 3].pnt.y = (trail[end].pos2.y - trail[end].pos1.y) * 0.25f + trail[end].pos1.y;
+                vtx_263[cnt + 3].pnt.z = (trail[end].pos2.z - trail[end].pos1.z) * 0.25f + trail[end].pos1.z;
+                if (ls < 0) {
+                    vtx_263[cnt].diffuse = -ls;
+                    vtx_263[cnt + 2].diffuse = 0;
+                } else {
+                    vtx_263[cnt].diffuse = ls + 0xFFFFFF;
+                    vtx_263[cnt + 2].diffuse = 0xFFFFFF;
+                }
+                if (le < 0) {
+                    vtx_263[cnt + 1].diffuse = -le;
+                    vtx_263[cnt + 3].diffuse = 0;
+                } else {
+                    vtx_263[cnt + 1].diffuse = le + 0xFFFFFF;
+                    vtx_263[cnt + 3].diffuse = 0xFFFFFF;
+                }
+                cnt += 4;
+                vtx_263[cnt].pnt = trail[Last].pos2;
+                vtx_263[cnt + 1].pnt = trail[end].pos2;
+                vtx_263[cnt + 2].pnt.x = (trail[Last].pos1.x - trail[Last].pos2.x) * 0.25f + trail[Last].pos2.x;
+                vtx_263[cnt + 2].pnt.y = (trail[Last].pos1.y - trail[Last].pos2.y) * 0.25f + trail[Last].pos2.y;
+                vtx_263[cnt + 2].pnt.z = (trail[Last].pos1.z - trail[Last].pos2.z) * 0.25f + trail[Last].pos2.z;
+                vtx_263[cnt + 3].pnt.x = (trail[end].pos1.x - trail[end].pos2.x) * 0.25f + trail[end].pos2.x;
+                vtx_263[cnt + 3].pnt.y = (trail[end].pos1.y - trail[end].pos2.y) * 0.25f + trail[end].pos2.y;
+                vtx_263[cnt + 3].pnt.z = (trail[end].pos1.z - trail[end].pos2.z) * 0.25f + trail[end].pos2.z;
+                if (ls < 0) {
+                    vtx_263[cnt].diffuse = 0xFFFFF - ls;
+                    vtx_263[cnt + 2].diffuse = 0xFFFFFF;
+                } else {
+                    vtx_263[cnt].diffuse = ls;
+                    vtx_263[cnt + 2].diffuse = 0;
+                }
+                if (le < 0) {
+                    vtx_263[cnt + 1].diffuse = 0xFFFFFF - le;
+                    vtx_263[cnt + 3].diffuse = 0xFFFFFF;
+                } else {
+                    vtx_263[cnt + 1].diffuse = le;
+                    vtx_263[cnt + 3].diffuse = 0;
+                }
+                cnt += 4;
+                Last = end;
+            } else {
+                Last = end;
+                le = 0;
+                Begin = 1;
             }
-            else if (uVar2 == -1) {
-                uVar5 = 0;
-                unaff_r15 = 1;
-            }
-            else {
-                uVar5 = trail[uVar9].intensity;
-                if ((trail[cnt - 2U & TRAILCOUNT - 1].pos1.x == -10000.0f) ||
-                   ((s32)(cnt - 1U) <= (cnt + 1) - TRAILCOUNT)) {
-                    uVar5 = 0;
-                }
-                else if ((trail[cnt - 1U & TRAILCOUNT - 1].pos1.x == -10000.0f) || (unaff_r15 != 0)) {
-                    uVar5 = ((uVar5 >> 0x18) - (uVar5 >> 0x1f)) * 0x800000 & 0xff000000;
-                }
-                vtx_263[iVar11].pnt = trail[uVar2].pos1;
-                //unaff_r15 = 0;
-
-                (vtx_263[cnt].pnt) = trail[uVar9].pos1;
-
-                vtx_263[iVar13].pnt.x = (trail[uVar2].pos2.x - trail[uVar2].pos1.x) * 0.25f + trail[uVar2].pos1.x;
-
-                vtx_263[iVar13].pnt.y = (trail[uVar2].pos2.y - trail[uVar2].pos1.y) * 0.25f + trail[uVar2].pos1.y;
-
-                vtx_263[iVar13].pnt.z = (trail[uVar2].pos2.z - trail[uVar2].pos1.z) * 0.25f + trail[uVar2].pos1.z;
-
-                 vtx_263[iVar12].nrm.x = (trail[uVar9].pos2.x - trail[uVar9].pos1.x) * 0.25f + trail[uVar9].pos1.x;
-
-                vtx_263[iVar12].nrm.y = (trail[uVar9].pos2.y - trail[uVar9].pos1.y) * 0.25f + trail[uVar9].pos1.y;
-
-                vtx_263[iVar12].nrm.z = (trail[uVar9].pos2.z - trail[uVar9].pos1.z) * 0.25f + trail[uVar9].pos1.z;
-
-
-                if (-1 > uVar5) {
-                    vtx_263[iVar11].diffuse = -uVar5;
-                    vtx_263[iVar13].diffuse = 0;
-                }
-                else {
-                    vtx_263[iVar11].diffuse = uVar5 + 0xffffff;
-                    vtx_263[iVar13].diffuse = 0xffffff;
-                }
-                if (uVar5 < 0) {
-                    vtx_263[iVar10].diffuse = -uVar5;
-                    vtx_263[iVar12].diffuse = 0;
-                }
-                else {
-                    vtx_263[iVar10].diffuse = uVar5 + 0xffffff;
-                    vtx_263[iVar12].diffuse = 0xffffff;
-                }
-                vtx_263[iVar11++].pnt = trail[uVar2].pos2;
-                vtx_263[iVar11++].pnt = trail[uVar9].pos2;
-                vtx_263[iVar13].pnt.x =
-                     (trail[uVar2].pos1.x - trail[uVar2].pos2.x) * 0.25f + trail[uVar2].pos2.x;
-                vtx_263[iVar13].pnt.y =
-                     (trail[uVar2].pos1.y - trail[uVar2].pos2.y) * 0.25f + trail[uVar2].pos2.y;
-                vtx_263[iVar13].pnt.z =
-                     (trail[uVar2].pos1.z - trail[uVar2].pos2.z) * 0.25f + trail[uVar2].pos2.z;
-                vtx_263[iVar12].nrm.x =
-                     (trail[uVar9].pos1.x - trail[uVar9].pos2.x) * 0.25f + trail[uVar9].pos2.x;
-                vtx_263[iVar12].nrm.y =
-                     (trail[uVar9].pos1.y - trail[uVar9].pos2.y) * 0.25f + trail[uVar9].pos2.y;
-                vtx_263[iVar12].nrm.z =
-                     (trail[uVar9].pos1.z - trail[uVar9].pos2.z) * 0.25f + trail[uVar9].pos2.z;
-                if (-1 > (s32)uVar5) {
-                    vtx_263[iVar11].diffuse = 0xfffff - uVar5;
-                }
-                else {
-                    vtx_263[iVar11].diffuse = uVar5;
-                }
-                if (-1 > (s32)uVar5) {
-                    vtx_263[iVar10].diffuse = 0xffffff - uVar5;
-                }
-                else {
-                    vtx_263[iVar10].diffuse = uVar5;
-                }
-                iVar12 = iVar12 + 0x120;
-                iVar13 = iVar13 + 0x120;
-                iVar10 = iVar10 + 0x120;
-                iVar11 = iVar11 + 0x120;
-                iVar8 = iVar8 + 4;
-            }
-            uVar2 = uVar9;
+        } else {
+            Last = -1;
         }
-    if (iVar8 != 0) {
-            for (iVar6 = 0; iVar6 <= iVar8; iVar6++) {
-                vp[iVar6] = &vtx_263[iVar6];
-                NuRndrStrip3d(&vp[iVar6],NuLightAddMat,0,4);
-            }
     }
-    return;
+
+    if (cnt != 0) {
+        for (loop = 0; loop < cnt - 4; loop += 4) {
+            vp[0] = &vtx_263[loop];
+            vp[1] = &vtx_263[loop + 1];
+            vp[2] = &vtx_263[loop + 2];
+            vp[3] = &vtx_263[loop + 3];
+            NuRndrStrip3d(vp, NuLightAddMat, 0, 4);
+        }
+    }
 }
 
 //MATCH GCN
@@ -1167,7 +1147,7 @@ void NuRndrWaterRip(struct numtl_s *mtl) {
     return;
 }
 
-//87% NGC
+//NGC MATCH
 void NuRndrShadPolys(struct numtl_s *mtl) {
     s32 s;
     s32 ind;
@@ -1192,26 +1172,28 @@ void NuRndrShadPolys(struct numtl_s *mtl) {
 
         for (ind = 0; ind < NuRndrShadowCnt; ind++) {
 
+            colour = 0; // second set keeps loop.c from hoisting the constant
             pos = NuRndrShadPolDat[ind].pos;
             size = NuRndrShadPolDat[ind].size;
 
+            colour = 0xFF000000;
             vtx[0].diffuse = colour;
             vtx[1].diffuse = colour;
             vtx[2].diffuse = colour;
             vtx[3].diffuse = colour;
-            colour = 0xFF000000;
+            pos.y += 0.01f;
 
             vtx[0].pnt.x = pos.x - size;
-            vtx[0].pnt.y = pos.y + 0.01f;
+            vtx[0].pnt.y = pos.y;
             vtx[0].pnt.z = pos.z - size;
             vtx[1].pnt.x = pos.x + size;
-            vtx[1].pnt.y = pos.y + 0.01f;
+            vtx[1].pnt.y = pos.y;
             vtx[1].pnt.z = pos.z - size;
             vtx[2].pnt.x = pos.x - size;
-            vtx[2].pnt.y = pos.y + 0.01f;
+            vtx[2].pnt.y = pos.y;
             vtx[2].pnt.z = pos.z + size;
             vtx[3].pnt.x = pos.x + size;
-            vtx[3].pnt.y = pos.y + 0.01f;
+            vtx[3].pnt.y = pos.y;
             vtx[3].pnt.z = pos.z + size;
 
             vtx[0].tc[0] = 0.0f;
@@ -1300,7 +1282,7 @@ void NuRndrAddShadow(struct nuvec_s* v, f32 scale, s16 shade, s16 xrot,  s16 yro
 }
 
 
-//DONE 93% (regswap)
+//NGC MATCH
 int NuHGobjRndr(struct NUHGOBJ_s *hgobj,struct numtx_s *wm,int nlayers,short *layers)
 {
   struct numtx_s *T;

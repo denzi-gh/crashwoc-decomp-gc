@@ -162,7 +162,7 @@ void AddMechanicalDebris(struct nuvec_s* pos, s32 vehicle) {
     }
 }
 
-//98.59% NGC - remaining diff: register allocation (action param spilled to stack instead of r14)
+//NGC 99.96%: remaining xrot/yrot register allocation differences.
 void AddAnimDebris(struct CharacterModel *model,struct numtx_s *mtxLOCATOR,s32 action,float time,struct obj_s *obj) {
   struct adeb_s *adeb;
   u16 xrot;
@@ -186,7 +186,7 @@ void AddAnimDebris(struct CharacterModel *model,struct numtx_s *mtxLOCATOR,s32 a
   s32 depth;
   s32 DoSound;
   
-  if ((Paused != 0) || (ADeb[0].character == -1)) {
+  if (Paused != 0) {
       return;
   }
   for(adeb = ADeb; adeb->character != -1; adeb++) {
@@ -314,64 +314,44 @@ LAB_8003d550:
                  NewBuzz(&player->rumble,adeb->buzz);
                }
           }
-          //sfx = (s32)adeb->sfx;
           if (((((adeb->sfx >= 0) && (adeb->sfx < SFXCOUNT_ALL)) || (adeb->sfx == 0x400)) || (adeb->sfx == 0x401)) &&
              ((adeb->random == 0 || (qrand() <= (adeb->random << 8))))) {
-            if (adeb->sfx == 0x400) {
+            sfx = adeb->sfx;
+            if (sfx == 0x400) {
               sfx = 0x8d;
               if (obj != NULL) {
                 if (obj->layer_type == 1) {
                   sfx = 0x2d;
-                }
-                else {
-                  //cVar10 = obj->surface_type;
-                /*  if (cVar10 < 6) {
-                   if ((cVar10 < 6) && (cVar10 != 1)) {
-LAB_8003d7f0:
+                } else {
+                  switch (obj->surface_type) {
+                    case 1:
+                    case 5:
+                    case 6:
+                    case 13:
+                    case 14:
+                    case 15:
                       sfx = 0x1f;
-                    }
-                  }*/
-                  //else if ((cVar10 < '\x10') && ('\f' < cVar10)) goto LAB_8003d7f0;
-                    switch(obj->surface_type) {
-                        case 1:
-                        case 5:
-                        case 6:
-                        case 13:
-                        case 14:
-                        case 15:
-                            sfx = 0x1f;
-                        break;
-                        default:
-                        break;
-                    }
-                }
-              }
-            }
-            else if ((adeb->sfx == 0x401) && (sfx = 0x8e, obj != NULL)) {
-              if (obj->layer_type == 1) {
-                sfx = 0x2e;
-              }
-              else {
-                //cVar10 = obj->surface_type;
-               /* if (cVar10 < 6) {
-                  if ((6 > cVar10) && (cVar10 != 1)) {
-LAB_8003d850:
-                    sfx = 0x20;
+                      break;
                   }
                 }
-                else if ((cVar10 < '\x10') && ('\f' < cVar10)) goto LAB_8003d850;*/
-                    switch(obj->surface_type) {
-                        case 1:
-                        case 5:
-                        case 6:
-                        case 13:
-                        case 14:
-                        case 15:
-                            sfx = 0x20;
-                        break;
-                        default:
-                        break;
-                    }
+              }
+            } else if (sfx == 0x401) {
+              sfx = 0x8e;
+              if (obj != NULL) {
+                if (obj->layer_type == 1) {
+                  sfx = 0x2e;
+                } else {
+                  switch (obj->surface_type) {
+                    case 1:
+                    case 5:
+                    case 6:
+                    case 13:
+                    case 14:
+                    case 15:
+                      sfx = 0x20;
+                      break;
+                  }
+                }
               }
             }
             //0x8003D448
@@ -456,21 +436,21 @@ LAB_8003d850:
                 default:
                   //cVar10 = obj->ddsnow;
                   if ((obj->ddsnow > 0) && (gindex == -1)) {
+                    depth = obj->ddsnow;
                     obj->ddr = 0x60;
                     obj->ddg = 0x70;
                     gindex = 6;
                     obj->ddb = -0x40;
                     obj->ddsnow = obj->ddsnow - 2;
-                    depth = (u8)obj->ddsnow;
                   }
                   //cVar10 = obj->ddsand;
                   if ((obj->ddsand > 0) && (gindex == -1)) {
-                    obj->ddsand -= 2;
+                    depth = obj->ddsand;
                     obj->ddr = -0x80;
                     obj->ddg = 0x50;
                     gindex = 0;
                     obj->ddb = 0x20;
-                    depth = obj->ddsand;
+                    obj->ddsand -= 2;
                   }
                   if (obj->ddwater > 0) {
                     if (gindex != -1) break;

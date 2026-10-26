@@ -125,7 +125,8 @@ struct objtab_s {
 
 struct tersurface_s {
   f32 friction;
-  u32 flags;
+  s16 gdeb;
+  u16 flags;
 };
 
 static struct nulsthdr_s* crates;
@@ -228,6 +229,7 @@ void AddQuad3DrotXYZ(struct nuvec_s *pos,struct nuvec_s *shape,struct numtl_s *m
 void HopCratesAbove(float speed, CrateCubeGroup *group, CrateCube *crate);
 CrateCube* InCrate(float x, float z, float top, float bot, float radius);
 s32 CrateOnTop(CrateCubeGroup *group, CrateCube *crate);
+s32 LowestCrate(CrateCubeGroup *group, CrateCube *crate);
 void UpdateCrates(void);
 void HeightSortCrateData(void);
 void ConvertCrateData(void);
@@ -1057,7 +1059,7 @@ void ResetCrate(CrateCube *crt) {
   return;
 }
 
-//NGC MATCH
+//NGC 99.77%: remaining register allocation differences.
 void ResetCrates(void) {
   CrateCubeGroup *group;
   CrateCube *crate;
@@ -1641,6 +1643,7 @@ void InitCrateExplosions(void) {
   return;
 }
 
+//NGC MATCH
 void AddCrateExplosion(struct nuvec_s *pos,s32 type,s32 ang,struct nuvec_s *colbox) {
   BoxExpType *box;
   s32 i;
@@ -1649,7 +1652,7 @@ void AddCrateExplosion(struct nuvec_s *pos,s32 type,s32 ang,struct nuvec_s *colb
   f32 tang;
 
   box = &BoxExpList[iBOXEXP];
-  BoxFace = box->BoxPol;
+  BoxFace = BoxExpList[iBOXEXP].BoxPol;
   box->type = type;
   box->time = CRATEEXPLOSIONFRAMES;
   box->colbox[0] = colbox[0];
@@ -1668,10 +1671,11 @@ void AddCrateExplosion(struct nuvec_s *pos,s32 type,s32 ang,struct nuvec_s *colb
       BoxFace->pos.x -= NuTrigTable[BoxFace->ang.y & 0xffff] * 0.25f;
       BoxFace->pos.z -= NuTrigTable[(BoxFace->ang.y + 0x4000) & 0xffff] * 0.25f;
       tang = (f32)(qrand() / 4 - 0x2000);
-      tang += BoxFace->ang.y;
-      BoxFace->mom.x = NuTrigTable[(s32)tang & 0xffff] * 0.25f * -0.12f;
+      BoxFace->mom.x = NuTrigTable[(s32)((f32)BoxFace->ang.y + tang) & 0xffff] *
+                       0.25f * -0.12f;
       BoxFace->mom.y = (f32)qrand() / 1966080.0f + 0.035f;
-      BoxFace->mom.z = NuTrigTable[(s32)(tang + 16384.0f) & 0xffff] * 0.25f * -0.12f;
+      BoxFace->mom.z = NuTrigTable[(s32)((f32)BoxFace->ang.y + tang + 16384.0f) & 0xffff] *
+                       0.25f * -0.12f;
     }
   }
   for(j = 0; j < 6; j++, BoxFace++) {
