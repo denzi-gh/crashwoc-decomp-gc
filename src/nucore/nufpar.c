@@ -151,64 +151,56 @@ struct nufpar_s* NuFParCreate(char* filename)
     return NULL;
 }
 
-//96.92% NGC (scheduler: li r30/lwz r9 order swapped at comment exit)
+//MATCH NGC
 s32 NuFParGetLine(struct nufpar_s* fPar) {
-    s32 i = 0;
-    char ch;
-    s32 lineNum = fPar->line_num;
-    char nul = 0;
+    char chr;
+    s32 quit;
+    s32 len;
+    s32 nul;
 
+    nul = 0;
+    len = 0;
     fPar->line_pos = 0;
-
-    for (;;) {
-        lineNum++;
-        fPar->line_num = lineNum;
-
-        for (;;) {
-            ch = NuGetChar(fPar);
-            switch (ch) {
-            case 0:
-                goto exit_func;
-            case CR:
-                NuGetChar(fPar);
-            case LF:
-                if (i != 0) {
-                    goto exit_func;
-                }
-                lineNum = fPar->line_num;
+    quit = 0;
+    fPar->line_num++;
+    while (1) {
+        chr = NuGetChar(fPar);
+        switch (chr) {
+        case CR:
+            chr = NuGetChar(fPar);
+        case LF:
+            if (len == 0) {
+                fPar->line_num++;
                 break;
-            exit_func:
-                fPar->lbuff[i] = nul;
-                return i;
-            case 0x3B:
-                if (i == 0) {
-                    {
-                        s32 done = 0;
-                        do {
-                            ch = NuGetChar(fPar);
-                            switch (ch) {
-                            case CR:
-                                NuGetChar(fPar);
-                            case 0:
-                            case LF:
-                                done = 1;
-                                break;
-                            }
-                        } while (done == 0);
-                        lineNum = fPar->line_num;
-                    }
-                    i = 0;
-                    fPar->line_pos = i;
-                    break;
-                }
-            default:
-                fPar->lbuff[i & 0xFF] = ch;
-                i++;
-                continue;
             }
+        case 0:
+            fPar->lbuff[len] = nul;
+            return len;
+        case ';':
+            if (len == 0) {
+                quit = 0;
+                while (quit == 0) {
+                    switch (NuGetChar(fPar)) {
+                    case CR:
+                        chr = NuGetChar(fPar);
+                    case LF:
+                    case 0:
+                        quit = 1;
+                        break;
+                    }
+                }
+                len = 0;
+                fPar->line_num++;
+                fPar->line_pos = 0;
+                break;
+            }
+        default:
+            fPar->lbuff[len & 0xff] = chr;
+            len++;
             break;
         }
     }
+    return len;
 }
 
 //MATCH NGC

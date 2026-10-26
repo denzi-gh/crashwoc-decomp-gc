@@ -58,6 +58,43 @@ typedef struct ELEC_s {
 
 struct gdeb_s {
   s32 i;
+  char *name;
+  u64 levbits;
+};
+
+struct chaseevent_s {
+  struct nugspline_s *spl;
+  struct nuhspecial_s obj[24];
+};
+
+struct chase_s {
+  struct nugspline_s *spl_START;
+  float time;
+  float duration;
+  struct nugspline_s *spl_CHASER[6];
+  struct nuvec_s pos[6];
+  struct RPos_s RPos[6];
+  struct anim_s anim[6];
+  struct nuhspecial_s obj[6];
+  short character[6];
+  short action[6];
+  u16 xrot[6];
+  u16 yrot[6];
+  u16 zrot[6];
+  struct chaseevent_s event[6][24];
+  struct nugspline_s *spl_MISC[6][4];
+  struct Nearest_Light_s lights[6];
+  float scale[6];
+  u8 misc_phase[6];
+  char ok[6];
+  u8 cuboid;
+  char i;
+  char i_last;
+  char i_next;
+  char status;
+  char iRAIL;
+  short iALONG;
+  float fALONG;
 };
 
 struct objtab_s {
@@ -77,6 +114,23 @@ extern struct objtab_s ObjTab[201];
 extern struct nugspline_s *pVIS;
 extern s32 iVIS;
 extern struct nuvec_s ShadNorm;
+extern struct chase_s Chase[3];
+extern float ShadRoofY;
+extern char *HutList[];
+extern s32 rsfxJung[];
+extern s32 VEHICLECONTROL;
+extern s32 SKELETALCRASH;
+extern s32 in_finish_range;
+extern s32 exkey;
+
+void FireBossWaterFire(s32 WaterOn);
+void NuBridgeOn(s32 flag);
+s32 StartHGobjAnim(struct nuhspecial_s *obj);
+void DebrisEmitterOrientation(s32 key, short emitrotz, short emitroty);
+void LaunchObjects(void);
+
+static float gauntletFarOffset = 80.0f;
+static float gauntletWobble = 200.0f;
 
 struct rbclass_s rbclass[5];
 volatile ELEC H2OElec[22];
@@ -126,248 +180,220 @@ struct deb3emit_s {
   float ang;
 };
 
-extern struct deb3emit_s Deb3Emit[7];
-extern struct deb3info Deb3Info[27];
+extern volatile struct deb3emit_s Deb3Emit[7];
+extern volatile struct deb3info Deb3Info[27];
 
-struct deb3_s *AddDeb3Ang(struct nuvec_s *pos, s32 db, s32 emit, struct nuangvec_s *angle, s32 rotx, s32 roty) {
-  s32 loop;
-  s32 flag;
-  struct deb3_s *deb;
-  float dist;
-  float ang2;
-  struct nuvec_s vec;
-  struct nuvec_s t;
-  struct nuangvec_s ang;
+//NGC MATCH
+struct deb3_s* AddDeb3Ang(struct nuvec_s* pos, s32 db, s32 emit, struct nuangvec_s* angle, s32 rotx, s32 roty) {
+    s32 loop;
+    s32 flag;
+    struct deb3_s* deb;
+    float dist;
+    float ang2;
+    struct nuvec_s vec;
+    struct nuvec_s t;
+    struct nuangvec_s ang;
 
-  for (loop = 0; loop <= 0x3f; loop++) {
-    deb = &deb3[debpt & 0x3f];
-    if ((float)deb->timer == 0.0f) {
-      pos->x += Deb3Emit[emit].px * (float)((qrand() - 0x8000) >> 8) * 0.0078125f;
-      pos->y += Deb3Emit[emit].py * (float)((qrand() - 0x8000) >> 8) * 0.0078125f;
-      pos->z += Deb3Emit[emit].pz * (float)((qrand() - 0x8000) >> 8) * 0.0078125f;
-
-      if (angle != NULL) {
-        ang = *angle;
-      } else {
-        ang.x = qrand();
-        ang.y = qrand();
-        ang.z = qrand();
-      }
-
-      NuMtxSetRotateXYZ(&deb->mtx, (s32 *)&ang);
-      NuMtxTranslate(&deb->mtx, pos);
-
-      vec.x = Deb3Emit[emit].vx * (float)((qrand() - 0x8000) >> 8) / 120.0f;
-      vec.y = (Deb3Emit[emit].vy * (float)((qrand() - 0x8000) >> 8) + Deb3Emit[emit].yoff * 128.0f) / 120.0f;
-      vec.z = Deb3Emit[emit].vz * (float)((qrand() - 0x8000) >> 8) / 120.0f;
-
-      NuVecRotateX(&vec, &vec, rotx);
-      NuVecRotateY(&vec, &vec, roty);
-
-      deb->velocity.x = vec.x;
-      deb->velocity.y = vec.y;
-      deb->velocity.z = vec.z;
-      deb->grav = Deb3Emit[emit].grav + Deb3Emit[emit].grav;
-      deb->angularvelocity.x = 0.0f;
-      deb->angularvelocity.y = 0.0f;
-      deb->angularvelocity.z = 0.0f;
-      deb->info = &Deb3Info[db];
-
-      ang2 = Deb3Emit[emit].ang;
-      if (ang2 != 0.0f) {
-        if (rbclass[deb->info->classid].mass != 0.0f) {
-          ang2 = ang2 / 2560.0f;
+    for (loop = 0; loop < 0x40; loop++, debpt++) {
+        deb = &deb3[debpt & 0x3f];
+        if (deb->timer == 0.0f) {
+            pos->x += (Deb3Emit[emit].px * (float)(qrand() - 0x8000 >> 8)) * 0.0078125f;
+            pos->y += (Deb3Emit[emit].py * (float)(qrand() - 0x8000 >> 8)) * 0.0078125f;
+            pos->z += (Deb3Emit[emit].pz * (float)(qrand() - 0x8000 >> 8)) * 0.0078125f;
+            if (angle != NULL) {
+                ang = *angle;
+            } else {
+                ang.x = qrand();
+                ang.y = qrand();
+                ang.z = qrand();
+            }
+            NuMtxSetRotateXYZ(&deb->mtx, &ang);
+            NuMtxTranslate(&deb->mtx, pos);
+            vec.x = (Deb3Emit[emit].vx * (float)(qrand() - 0x8000 >> 8)) / 120.0f;
+            vec.y = (Deb3Emit[emit].vy * (float)(qrand() - 0x8000 >> 8) + Deb3Emit[emit].yoff * 128.0f) / 120.0f;
+            vec.z = (Deb3Emit[emit].vz * (float)(qrand() - 0x8000 >> 8)) / 120.0f;
+            NuVecRotateX(&vec, &vec, rotx);
+            NuVecRotateY(&vec, &vec, roty);
+            deb->velocity.x = vec.x;
+            deb->velocity.y = vec.y;
+            deb->velocity.z = vec.z;
+            deb->grav = Deb3Emit[emit].grav * 2.0f;
+            ang2 = Deb3Emit[emit].ang;
+            deb->angularvelocity.x = 0.0f;
+            deb->angularvelocity.y = 0.0f;
+            deb->angularvelocity.z = 0.0f;
+            deb->info = (struct deb3info*)&Deb3Info[db];
+            if (ang2 != 0.0f) {
+                if (rbclass[deb->info->classid].mass != 0.0f) {
+                    ang2 = (ang2 / 2560.0f);
+                }
+                deb->angularMomentum.x = ((qrand() - 0x8000 >> 8) * ang2);
+                deb->angularMomentum.y = ((qrand() - 0x8000 >> 8) * ang2);
+                deb->angularMomentum.z = ((qrand() - 0x8000 >> 8) * ang2);
+            } else {
+                deb->angularMomentum.x = 0.0f;
+                deb->angularMomentum.y = 0.0f;
+                deb->angularMomentum.z = 0.0f;
+            }
+            deb->status = 0;
+            deb->timer = (deb->info->timer * 60.0f);
+            deb->count = 0;
+            deb->diff.x = 0.0f;
+            deb->diff.y = 0.0f;
+            deb->diff.z = 0.0f;
+            deb->data = deb->info->data;
+            t.x = deb->mtx._30;
+            t.y = deb->mtx._31;
+            t.z = deb->mtx._32;
+            vec.x = ((deb->velocity.x * 8.0f) / 60.0f);
+            vec.y = ((deb->velocity.y * 8.0f) / 60.0f);
+            vec.z = ((deb->velocity.z * 8.0f) / 60.0f);
+            dist = (vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
+            if ((deb->info->info & 8U) != 0) {
+                flag = 0;
+            } else {
+                flag = NewRayCast(&t, &vec, deb->info->size);
+            }
+            if (flag == 0) {
+                deb->status |= 2;
+            }
+            if ((flag == 2 || flag == 1 || flag == 3 || flag == 4 || flag == 5 || flag == 6 || flag == 7 || flag == 8
+                 || flag == 9 || flag == 10 || flag == 11 || flag == 12 || flag == 13 || flag == 14 || flag == 15)
+                || (flag > 0xf && ((deb->status & 2U) != 0)))
+            {
+                deb->impact.x = t.x + vec.x;
+                deb->impact.y = t.y + vec.y;
+                deb->impact.z = t.z + vec.z;
+                vec.x = vec.x * vec.x + vec.y * vec.y + vec.z * vec.z;
+                deb->norm = ShadNorm;
+                vec.x = NuFsqrt(vec.x);
+                dist = NuFsqrt(dist);
+                if (dist == 0.0f) {
+                    deb->check = 0;
+                } else {
+                    deb->check = ((vec.x * 8.0f) / dist);
+                }
+                if (deb->check == 0) {
+                    deb->mtx._30 = deb->impact.x;
+                    deb->mtx._31 = deb->impact.y;
+                    deb->mtx._32 = deb->impact.z;
+                }
+            } else {
+                deb->check = 8;
+                deb->norm.y = 100.0f;
+            }
+            return deb;
         }
-        deb->angularMomentum.x = (float)((qrand() - 0x8000) >> 8) * ang2;
-        deb->angularMomentum.y = (float)((qrand() - 0x8000) >> 8) * ang2;
-        deb->angularMomentum.z = (float)((qrand() - 0x8000) >> 8) * ang2;
-      } else {
-        deb->angularMomentum.z = 0.0f;
-        deb->angularMomentum.x = 0.0f;
-        deb->angularMomentum.y = 0.0f;
-      }
-
-      vec.x = deb->velocity.x * 8.0f / 60.0f;
-      vec.y = deb->velocity.y * 8.0f / 60.0f;
-      deb->status = 0;
-      vec.z = deb->velocity.z * 8.0f / 60.0f;
-      t.x = deb->mtx._30;
-      deb->timer = (s16)(deb->info->timer * 60.0f);
-      deb->count = 0;
-      deb->diff.x = 0.0f;
-      deb->diff.y = 0.0f;
-      deb->diff.z = 0.0f;
-      t.y = deb->mtx._31;
-      t.z = deb->mtx._32;
-      deb->data = deb->info->data;
-      dist = vec.x * vec.x + vec.y * vec.y + vec.z * vec.z;
-
-      if ((deb->info->info & 8U) != 0) {
-        flag = 0;
-      } else {
-        flag = NewRayCast(&t, &vec, deb->info->size);
-      }
-
-      if (flag == 0) {
-        deb->status |= 2;
-      }
-
-      if (((flag - 1) <= 0xeU) ||
-          ((flag > 0xf) && ((deb->status & 2U) != 0))) {
-        deb->impact.x = t.x + vec.x;
-        deb->impact.y = t.y + vec.y;
-        deb->impact.z = t.z + vec.z;
-        deb->norm = ShadNorm;
-
-        ang2 = vec.x * vec.x + vec.y * vec.y + vec.z * vec.z;
-        ang2 = NuFsqrt(ang2);
-        dist = NuFsqrt(dist);
-
-        if (dist == 0.0f) {
-          deb->check = 0;
-        } else {
-          deb->check = (s16)(ang2 * 8.0f / dist);
-        }
-
-        if (deb->check == 0) {
-          deb->mtx._30 = deb->impact.x;
-          deb->mtx._31 = deb->impact.y;
-          deb->mtx._32 = deb->impact.z;
-        }
-      } else {
-        deb->check = 8;
-        deb->norm.y = 100.0f;
-      }
-
-      return deb;
     }
-    debpt++;
-  }
-  debpt &= 0x3f;
-  return NULL;
+    debpt &= 0x3f;
+    return NULL;
 }
 
-/*
-	AddDeb3           65%
-	LaunchObjects  86%
-*/
+//NGC MATCH
+struct deb3_s* AddDeb3(struct nuvec_s* pos, s32 db, s32 emit, struct nuangvec_s* angle) {
+    s32 loop;
+    s32 flag;
+    struct deb3_s* deb;
+    float dist;
+    float ang2;
+    struct nuvec_s vec;
+    struct nuvec_s t;
+    struct nuangvec_s ang;
 
-struct deb3_s *AddDeb3(struct nuvec_s *pos, s32 db, s32 emit, struct nuangvec_s *angle) {
-  s32 loop;
-  s32 flag;
-  struct deb3_s *deb;
-  float dist;
-  float ang2;
-  struct nuvec_s vec;
-  struct nuvec_s t;
-  struct nuangvec_s ang;
-
-  for (loop = 0; loop <= 0x3f; loop++) {
-    deb = &deb3[debpt & 0x3f];
-    if ((float)deb->timer == 0.0f) {
-      pos->x += Deb3Emit[emit].px * (float)((qrand() - 0x8000) >> 8) * 0.0078125f;
-      pos->y += Deb3Emit[emit].py * (float)((qrand() - 0x8000) >> 8) * 0.0078125f;
-      pos->z += Deb3Emit[emit].pz * (float)((qrand() - 0x8000) >> 8) * 0.0078125f;
-
-      if (angle != NULL) {
-        ang = *angle;
-      } else {
-        ang.x = qrand();
-        ang.y = qrand();
-        ang.z = qrand();
-      }
-
-      NuMtxSetRotateXYZ(&deb->mtx, (s32 *)&ang);
-      NuMtxTranslate(&deb->mtx, pos);
-
-      deb->velocity.y = (Deb3Emit[emit].vy * (float)((qrand() - 0x8000) >> 8) + Deb3Emit[emit].yoff * 128.0f) / 120.0f;
-
-      if (Deb3Emit[emit].vx >= 0.0f) {
-        deb->velocity.x = Deb3Emit[emit].vx * (float)((qrand() - 0x8000) >> 8) / 120.0f;
-        deb->velocity.z = Deb3Emit[emit].vz * (float)((qrand() - 0x8000) >> 8) / 120.0f;
-      } else {
-        deb->velocity.x = Deb3Emit[emit].vz * NuTrigTable[(u16)angle->y];
-        deb->velocity.z = Deb3Emit[emit].vz * NuTrigTable[(u16)(angle->y + 0x4000)];
-      }
-
-      deb->grav = Deb3Emit[emit].grav + Deb3Emit[emit].grav;
-      deb->angularvelocity.x = 0.0f;
-      deb->angularvelocity.y = 0.0f;
-      deb->angularvelocity.z = 0.0f;
-      deb->info = &Deb3Info[db];
-
-      ang2 = Deb3Emit[emit].ang;
-      if (ang2 != 0.0f) {
-        if (rbclass[deb->info->classid].mass != 0.0f) {
-          ang2 = ang2 / 2560.0f;
+    for (loop = 0; loop < 0x40; loop++, debpt++) {
+        deb = &deb3[debpt & 0x3f];
+        if (deb->timer == 0.0f) {
+            pos->x += (Deb3Emit[emit].px * (float)((qrand() - 0x8000) >> 8)) * 0.0078125f;
+            pos->y += (Deb3Emit[emit].py * (float)((qrand() - 0x8000) >> 8)) * 0.0078125f;
+            pos->z += (Deb3Emit[emit].pz * (float)((qrand() - 0x8000) >> 8)) * 0.0078125f;
+            if (angle != NULL) {
+                ang = *angle;
+            } else {
+                ang.x = qrand();
+                ang.y = qrand();
+                ang.z = qrand();
+            }
+            NuMtxSetRotateXYZ(&deb->mtx, &ang);
+            NuMtxTranslate(&deb->mtx, pos);
+            deb->velocity.y =
+                (Deb3Emit[emit].vy * (float)((qrand() - 0x8000) >> 8) + Deb3Emit[emit].yoff * 128.0f) / 120.0f;
+            if (Deb3Emit[emit].vx >= 0.0f) {
+                deb->velocity.x = (Deb3Emit[emit].vx * (float)((qrand() - 0x8000) >> 8)) / 120.0f;
+                deb->velocity.z = (Deb3Emit[emit].vz * (float)((qrand() - 0x8000) >> 8)) / 120.0f;
+            } else {
+                deb->velocity.x = Deb3Emit[emit].vz * NuTrigTable[(u16)angle->y];
+                deb->velocity.z = Deb3Emit[emit].vz * NuTrigTable[(angle->y + 0x4000) & 0xffff];
+            }
+            deb->grav = Deb3Emit[emit].grav * 2.0f;
+            ang2 = Deb3Emit[emit].ang;
+            deb->info = (struct deb3info*)&Deb3Info[db];
+            deb->angularvelocity.x = 0.0f;
+            deb->angularvelocity.y = 0.0f;
+            deb->angularvelocity.z = 0.0f;
+            if (ang2 != 0.0f) {
+                if (rbclass[Deb3Info[db].classid].mass != 0.0f) {
+                    ang2 = (ang2 / 2560.0f);
+                }
+                deb->angularMomentum.x = (float)((qrand() - 0x8000) >> 8) * ang2;
+                deb->angularMomentum.y = (float)((qrand() - 0x8000) >> 8) * ang2;
+                deb->angularMomentum.z = (float)((qrand() - 0x8000) >> 8) * ang2;
+            } else {
+                deb->angularMomentum.x = 0.0f;
+                deb->angularMomentum.y = 0.0f;
+                deb->angularMomentum.z = 0.0f;
+            }
+            deb->status = 0;
+            deb->timer = (short)(deb->info->timer * 60.0f);
+            deb->count = 0;
+            deb->diff.x = 0.0f;
+            deb->diff.y = 0.0f;
+            deb->diff.z = 0.0f;
+            deb->data = deb->info->data;
+            t.x = deb->mtx._30;
+            t.y = deb->mtx._31;
+            t.z = deb->mtx._32;
+            vec.x = (deb->velocity.x * 8.0f) / 60.0f;
+            vec.y = (deb->velocity.y * 8.0f) / 60.0f;
+            vec.z = (deb->velocity.z * 8.0f) / 60.0f;
+            dist = (vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
+            if ((deb->info->info & 8U) != 0) {
+                flag = 0;
+            } else {
+                flag = NewRayCast(&t, &vec, deb->info->size);
+            }
+            if (flag == 0) {
+                deb->status = deb->status | 2;
+            }
+            if ((flag == 2 || flag == 1 || flag == 3 || flag == 4 || flag == 5 || flag == 6 || flag == 7 || flag == 8
+                 || flag == 9 || flag == 10 || flag == 11 || flag == 12 || flag == 13 || flag == 14 || flag == 15)
+                || ((flag > 0xf && ((deb->status & 2U) != 0))))
+            {
+                deb->impact.x = t.x + vec.x;
+                deb->impact.y = t.y + vec.y;
+                deb->impact.z = t.z + vec.z;
+                vec.x = vec.x * vec.x + vec.y * vec.y + vec.z * vec.z;
+                deb->norm = ShadNorm;
+                vec.x = NuFsqrt(vec.x);
+                ang2 = NuFsqrt(dist);
+                if (ang2 == 0.0f) {
+                    deb->check = 0;
+                } else {
+                    deb->check = ((vec.x * 8.0f) / ang2);
+                }
+                if (deb->check == 0) {
+                    deb->mtx._30 = deb->impact.x;
+                    deb->mtx._31 = deb->impact.y;
+                    deb->mtx._32 = deb->impact.z;
+                }
+            } else {
+                deb->check = 8;
+                deb->norm.y = 100.0f;
+            }
+            return deb;
         }
-        deb->angularMomentum.x = (float)((qrand() - 0x8000) >> 8) * ang2;
-        deb->angularMomentum.y = (float)((qrand() - 0x8000) >> 8) * ang2;
-        deb->angularMomentum.z = (float)((qrand() - 0x8000) >> 8) * ang2;
-      } else {
-        deb->angularMomentum.z = 0.0f;
-        deb->angularMomentum.x = 0.0f;
-        deb->angularMomentum.y = 0.0f;
-      }
-
-      vec.x = deb->velocity.x * 8.0f / 60.0f;
-      vec.y = deb->velocity.y * 8.0f / 60.0f;
-      deb->status = 0;
-      vec.z = deb->velocity.z * 8.0f / 60.0f;
-      t.x = deb->mtx._30;
-      deb->timer = (s16)(deb->info->timer * 60.0f);
-      deb->count = 0;
-      deb->diff.x = 0.0f;
-      deb->diff.y = 0.0f;
-      deb->diff.z = 0.0f;
-      t.y = deb->mtx._31;
-      t.z = deb->mtx._32;
-      deb->data = deb->info->data;
-      dist = vec.x * vec.x + vec.y * vec.y + vec.z * vec.z;
-
-      if ((deb->info->info & 8U) != 0) {
-        flag = 0;
-      } else {
-        flag = NewRayCast(&t, &vec, deb->info->size);
-      }
-
-      if (flag == 0) {
-        deb->status |= 2;
-      }
-
-      if (((flag - 1) <= 0xeU) ||
-          ((flag > 0xf) && ((deb->status & 2U) != 0))) {
-        deb->impact.x = t.x + vec.x;
-        deb->impact.y = t.y + vec.y;
-        deb->impact.z = t.z + vec.z;
-        deb->norm = ShadNorm;
-
-        ang2 = vec.x * vec.x + vec.y * vec.y + vec.z * vec.z;
-        ang2 = NuFsqrt(ang2);
-        dist = NuFsqrt(dist);
-
-        if (dist == 0.0f) {
-          deb->check = 0;
-        } else {
-          deb->check = (s16)(ang2 * 8.0f / dist);
-        }
-
-        if (deb->check == 0) {
-          deb->mtx._30 = deb->impact.x;
-          deb->mtx._31 = deb->impact.y;
-          deb->mtx._32 = deb->impact.z;
-        }
-      } else {
-        deb->check = 8;
-        deb->norm.y = 100.0f;
-      }
-
-      return deb;
     }
-    debpt++;
-  }
-  debpt &= 0x3f;
-  return NULL;
+    debpt = debpt & 0x3f;
+    return NULL;
 }
 
 //NGC MATCH
@@ -791,6 +817,679 @@ void DynaBreak(struct deb3_s *deb) {
   AddGameDebris(0x44,&pos);
   GameSfx(0x3b,&pos);
   return;
+}
+
+//99.79% NGC (level dispatch/scheduling/regswap)
+void LaunchObjects(void) {
+    float* pt;
+    float temp;
+    float dx;
+    float dy;
+    float dz;
+    s32 loop;
+    s32 key;
+    s32 count;
+    s32 ang;
+    struct nuvec_s vec;
+    struct nuvec_s vec2;
+    struct nuhspecial_s obj;
+    s32 r;
+    s32 g;
+    s32 b;
+    s32 hazea;
+
+    jonframe1++;
+    r = 0x80;
+    g = 0x80;
+    b = 0x80;
+    hazea = 0;
+    if (Level == 0x19) {
+        if (jcrunch == 1) {
+            b = 1;
+            g = 0x40;
+        }
+        if (jcrunch == 2) {
+            r = 0x40;
+            g = 0x60;
+            b = 0x7E;
+        }
+        if (jcrunch == 3) {
+            r = 0x80;
+            g = 0x40;
+            b = 3;
+            hazea = 1;
+        }
+        if (jcrunch == 4) {
+            g = 0;
+            b = 0x40;
+            hazea = 0;
+            r = (s32)(NuTrigTable[(u16)(water1 / 60)] * 64.0f) + 0x40;
+        }
+        if (jcrunch == 0) {
+            if (water2 < 0) {
+                water2 = -water2;
+            }
+            water2 -= 480;
+            if (water2 < 0) {
+                water2 = 0;
+            }
+            if (LDATA->hazea != 0) {
+                LDATA->hazea -= 8;
+                if ((s8)LDATA->hazea < 0) {
+                    LDATA->hazea = 0;
+                }
+            }
+        } else if (water2 >= 0) {
+            if (LDATA->hazea != 0) {
+                LDATA->hazea -= 8;
+                if ((s8)LDATA->hazea < 0) {
+                    LDATA->hazea = 0;
+                }
+            }
+            water2 -= 480;
+            if (water2 < 0) {
+                LDATA->fogr = r;
+                LDATA->fogg = g;
+                LDATA->fogb = b;
+                LDATA->hazea = hazea;
+            }
+        } else {
+            vec.x = 0.0f;
+            vec.y = 2.13f;
+            vec.z = 4.69f;
+            switch (LDATA->fogb & 3) {
+                case 1:
+                    AddVariableShotDebrisEffect(GDeb[122].i, &vec, 1, 0, 0);
+                    break;
+                case 2:
+                    AddVariableShotDebrisEffect(GDeb[123].i, &vec, 1, 0, 0);
+                    break;
+                case 3:
+                    vec.y += 3.43f;
+                    AddVariableShotDebrisEffect(GDeb[125].i, &vec, 2, -0x8000, 0);
+                    break;
+                case 0:
+                    AddVariableShotDebrisEffect(GDeb[124].i, &vec, 1, 0, 0);
+                    break;
+            }
+            water2 = water2 - 0x1e0;
+            if (water2 < -0x1e00) {
+                water2 = -0x1e00;
+            }
+            if ((LDATA->hazea != 0) && (LDATA->hazea += 8, (LDATA->hazea & 0x80) != 0)) {
+                LDATA->hazea = 0x7f;
+            }
+            if (LDATA->fogb == 0x40) {
+                water1 = JonMaskFPS(water1, 800);
+                LDATA->fogr = (char)(NuTrigTable[(water1 / 0x3c) & 0xffff] * 64.0f) + 0x40;
+            }
+        }
+        LDATA->foga = ((water2 / 0x78) >= 0 ? (water2 / 0x78) : -(water2 / 0x78));
+        dmask = jcrunch;
+        if ((cmask == jcrunch) && (cmask != 0)) {
+            maskoff += 0x5a00;
+            if (maskoff > 0xf0000) {
+                maskoff = 0xf0000;
+            }
+        } else {
+            maskoff -= 0x5a00;
+            if (maskoff < 0) {
+                maskoff = 0;
+                cmask = jcrunch;
+            }
+        }
+        maskx = JonMaskFPS(maskx, 0x1c2);
+        masky = JonMaskFPS(masky, 800);
+        maskrot = JonMaskFPS(maskrot, 600);
+    }
+    if ((Level == 0x21) && ((jonframe1 & 1U) == 0)) {
+        vec.x = global_camera.mtx._30;
+        vec.y = global_camera.mtx._31;
+        vec.z = global_camera.mtx._32;
+        vec2.x = player->obj.pos.x - global_camera.mtx._30;
+        vec2.z = player->obj.pos.z - global_camera.mtx._32;
+        ang = NuAtan2D(vec2.x, vec2.z);
+        vec.x = NuTrigTable[ang & 0xffff] * 5.0f + vec.x;
+        vec.z = NuTrigTable[(ang + 0x4000) & 0xffff] * 5.0f + vec.z;
+        AddVariableShotDebrisEffect(GDeb[115].i, &vec, 1, 0, 0);
+    }
+    if ((Level == 0x1f) && ((jonframe1 & 1U) == 0)) {
+        vec.x = global_camera.mtx._30;
+        vec.y = global_camera.mtx._31;
+        vec.z = global_camera.mtx._32;
+        vec2.x = player->obj.pos.x - global_camera.mtx._30;
+        vec2.z = player->obj.pos.z - global_camera.mtx._32;
+        ang = NuAtan2D(vec2.x, vec2.z);
+        vec.x = NuTrigTable[ang & 0xffff] * 5.0f + vec.x;
+        vec.z = NuTrigTable[(ang + 0x4000) & 0xffff] * 5.0f + vec.z;
+        AddVariableShotDebrisEffect(GDeb[115].i, &vec, 1, 0, 0);
+    }
+    if (Level == 0x14) {
+        if ((jonframe1 & 1U) == 0) {
+            vec.x = global_camera.mtx._30;
+            vec.y = global_camera.mtx._31;
+            vec.z = global_camera.mtx._32;
+            vec2.x = player->obj.pos.x - global_camera.mtx._30;
+            vec2.z = player->obj.pos.z - global_camera.mtx._32;
+            ang = NuAtan2D(vec2.x, vec2.z);
+            vec.x = NuTrigTable[ang & 0xffff] * 5.0f + vec.x;
+            vec.z = NuTrigTable[(ang + 0x4000) & 0xffff] * 5.0f + vec.z;
+            AddVariableShotDebrisEffect(GDeb[115].i, &vec, 1, 0, 0);
+        }
+        if ((flooron != 0) || (roofon != 0)) {
+            for (loop = 0; loop < 4; loop++) {
+                vec.x = (float)(qrand() - 0x8000) * 0.00024414062f + player->obj.pos.x;
+                vec.y = player->obj.pos.y + 0.5f;
+                vec.z = (float)(qrand() - 0x8000) * 0.00024414062f + player->obj.pos.z;
+                if ((vec.z > 58.0f) && (vec.z < 66.0f)) {
+                    vec.y = NewShadow(&vec, 0.0f);
+                    if ((flooron != 0)
+                        && ((((vec.y != 2000000.0f && (vec.x > 18.0f)) && (vec.x < 50.0f)) && (vec.y > (floor1 - 0.2f)))
+                        ))
+                    {
+                        vec.y = (vec.y - 0.1f);
+                        key = -1;
+                        AddFiniteShotDebrisEffect(&key, GDeb[109].i, &vec, 1);
+                    }
+                    if (roofon != 0) {
+                        vec.y = ShadRoofY;
+                        if (((ShadRoofY != 2000000.0f) && (ShadRoofY < (roof1 + 0.2f)))
+                            && ((15.0f < vec.x && (vec.x < 55.0f))))
+                        {
+                            vec.y = (ShadRoofY + 0.1f);
+                            key = -1;
+                            AddFiniteShotDebrisEffect(&key, GDeb[109].i, &vec, 1);
+                        }
+                    }
+                }
+            }
+            if (roofon != 0) {
+                roofon = roofon - 0x3c;
+                if (roofon < 0) {
+                    roofon = 0;
+                }
+                if (roofon < 0x1068) {
+                    if (ObjTab[150].obj.special != NULL) {
+                        ((ObjTab[150].obj.special)->instance->mtx)._31 = floor1 - 100.0f;
+                    }
+                    if (ObjTab[151].obj.special != NULL) {
+                        ((ObjTab[151].obj.special)->instance->mtx)._31 = roof1;
+                    }
+                }
+                goto LAB_8002512c;
+            }
+        }
+        if (flooron != 0) {
+            flooron -= 0x3c;
+            if (flooron < 0) {
+                flooron = 0;
+            }
+            if (flooron < 0x1068) {
+                if (ObjTab[150].obj.special != NULL) {
+                    ((ObjTab[150].obj.special)->instance->mtx)._31 = floor1;
+                }
+                if (ObjTab[151].obj.special != NULL) {
+                    ((ObjTab[151].obj.special)->instance->mtx)._31 = roof1 - 100.0f;
+                }
+            }
+        } else {
+            if (ObjTab[150].obj.special != NULL) {
+                ((ObjTab[150].obj.special)->instance->mtx)._31 = floor1 - 100.0f;
+            }
+            if (ObjTab[151].obj.special != NULL) {
+                ((ObjTab[151].obj.special)->instance->mtx)._31 = roof1 - 100.0f;
+            }
+            water1 = water1 - 0x3c;
+            if (water1 < 0) {
+                water1 = ((qrand() & 0x7f) + 0x1e) * 0x3c;
+                water2 = 1 - water2;
+                if (water2 != 0) {
+                    flooron = 0x1c20;
+                } else {
+                    roofon = 0x1c20;
+                }
+            }
+        }
+    }
+LAB_8002512c:
+    if (((Level == 0x16) && (VEHICLECONTROL == 1)) && ((player->obj.anim.newaction == 0x68 && (Pad[0] != NULL)))) {
+        FireBossWaterFire(Pad[0]->paddata & 0x80);
+        vec.x = player->mtxLOCATOR[8][0]._30;
+        vec.y = player->mtxLOCATOR[8][0]._31;
+        vec.z = player->mtxLOCATOR[8][0]._32;
+        if ((Pad[0]->paddata & 0x80) != 0) {
+            AddVariableShotDebrisEffect(GDeb[108].i, &vec, 4, 0x3d54, player->obj.hdg + 0x4000);
+        }
+    }
+    if ((Level == 0xe) && (Chase[0].status == 2)) {
+        vec.x = Chase[0].pos[0].x;
+        vec.y = Chase[0].pos[0].y;
+        vec.z = Chase[0].pos[0].z;
+        vec.z -= 2.5f;
+        vec.y += 0.2f;
+        AddVariableShotDebrisEffect(GDeb[100].i, &vec, 2, 0, 0);
+        vec.y = Chase[0].pos[0].y + 0.6f;
+        AddVariableShotDebrisEffect(GDeb[101].i, &vec, 1, 0, 0);
+        vec.y = Chase[0].pos[0].y + 3.0f;
+        AddVariableShotDebrisEffect(GDeb[103].i, &vec, 2, -0x218, 0);
+        vec.y = Chase[0].pos[0].y + 3.6f;
+        AddVariableShotDebrisEffect(GDeb[102].i, &vec, 4, -0x600, 0);
+    }
+    if (Level == 0x13) {
+        dx = global_camera.mtx._30 - -0.0f;
+        dz = global_camera.mtx._32 - -0.0f;
+        dy = dx * dx + dz * dz;
+        dx = NuFsqrt(dy);
+        dx = 50.0f - dx * 0.125f;
+        if (dx < 0.0f) {
+            dx = 0.0f;
+        }
+        LDATA->fogg = dx;
+    }
+    if (((Level == 0x22) || (Level == 2)) || (Level == 6)) {
+        LDATA->fogg = (char)(NuTrigTable[(water1 / 0x3c) & 0xffff] * 30.0f) + 0x28;
+        LDATA->fogb = (char)(NuTrigTable[(water2 / 0x3c) & 0xffff] * 30.0f) + 0x32;
+        water1 = JonMaskFPS(water1, 0x6e);
+        water2 = JonMaskFPS(water2, 0x69);
+        if (((jonframe1 & 1U) == 0) && (VEHICLECONTROL != 0)) {
+            vec.x = global_camera.mtx._30;
+            vec.y = global_camera.mtx._31;
+            vec.z = global_camera.mtx._32;
+            vec2.x = player->obj.pos.x - global_camera.mtx._30;
+            vec2.z = player->obj.pos.z - global_camera.mtx._32;
+            ang = NuAtan2D(vec2.x, vec2.z);
+            vec.x = NuTrigTable[ang & 0xffff] * 5.0f + vec.x;
+            vec.z = NuTrigTable[(ang + 0x4000) & 0xffff] * 5.0f + vec.z;
+            AddVariableShotDebrisEffect(GDeb[151].i, &vec, 1, 0, 0);
+        }
+    }
+    if ((Level == 0xf) && (player->obj.dead == 0)) {
+        key = (u32)LDATA->foga * 0x3c;
+        if (SKELETALCRASH != 0) {
+            if (key < 0x1e00) {
+                key = 0x1e00;
+            }
+            if (key <= 0x3a1f) {
+                key += 0x1e0;
+            } else {
+                key = 0x3bc4;
+            }
+        } else {
+            if (0x1e00 < key) {
+                key = 0x1e00;
+            }
+            if (0xf00 < key) {
+                key -= 0x1e0;
+            } else {
+                key = 0xf00;
+            }
+        }
+        LDATA->foga = (s8)((float)(key / 0x3c) * 0.5f);
+        key = (u32)LDATA->hazea * 0x3c;
+        if (VEHICLECONTROL != 1) {
+            key -= 300;
+            if (key < 0) {
+                key = 0;
+            }
+        } else {
+            key += 300;
+            if (key > 0x2b98) {
+                key = 0x2b98;
+            }
+            vec.x = NuTrigTable[(player->obj.hdg + 0x1000) & 0xffff] * -0.3f + player->obj.pos.x;
+            vec.y = player->obj.pos.y + 0.55f;
+            vec.z = NuTrigTable[(player->obj.hdg + 0x5000) & 0xffff] * -0.3f + player->obj.pos.z;
+            AddVariableShotDebrisEffect(GDeb[104].i, &vec, 1, 0x4000, player->obj.hdg + 0xc000);
+            vec.x = NuTrigTable[(player->obj.hdg - 0x1000) & 0xffff] * -0.3f + player->obj.pos.x;
+            vec.z = NuTrigTable[(player->obj.hdg + 0x3000) & 0xffff] * -0.3f + player->obj.pos.z;
+            AddVariableShotDebrisEffect(GDeb[104].i, &vec, 1, 0x4000, player->obj.hdg + 0xc000);
+        }
+        LDATA->hazea = (u8)((s32)key / 0x3c);
+    }
+    if (((Level == 0x1d) && (in_finish_range < 0x3c)) && (player->obj.dead == 0)) {
+        vec.x = NuTrigTable[(player->obj.hdg + 0x1000) & 0xffff] * -0.3f + player->obj.pos.x;
+        vec.y = player->obj.pos.y + 0.55f;
+        vec.z = NuTrigTable[(player->obj.hdg + 0x5000) & 0xffff] * -0.3f + player->obj.pos.z;
+        AddVariableShotDebrisEffect(GDeb[104].i, &vec, 1, 0x4000, player->obj.hdg + 0xc000);
+        vec.x = NuTrigTable[(player->obj.hdg - 0x1000) & 0xffff] * -0.3f + player->obj.pos.x;
+        vec.z = NuTrigTable[(player->obj.hdg + 0x3000) & 0xffff] * -0.3f + player->obj.pos.z;
+        AddVariableShotDebrisEffect(GDeb[104].i, &vec, 1, 0x4000, player->obj.hdg + 0xc000);
+    }
+    if (Level == 10) {
+        dx = global_camera.mtx._30 - -0.46f;
+        dz = global_camera.mtx._32 - -77.3f;
+        dy = dx * dx + dz * dz;
+        dx = NuFsqrt(dy) - 8.0f;
+        if (dx < 1.0f) {
+            dx = 1.0f;
+        }
+        if (dx > 20.0f) {
+            LDATA->fogr = 0;
+            LDATA->fogg = 0;
+            LDATA->fogb = 0;
+            LDATA->foga = 0;
+            LDATA->hazea = 0;
+            LDATA->fognear = 20.0f;
+            LDATA->fogfar = gauntletFarOffset;
+        } else {
+            float fog_scale = 1.0f - dx / 20.0f;
+            float haze_height;
+            float haze_scale;
+            float distance_scale;
+
+            LDATA->fogr = (s32)(fog_scale * 80.0f);
+            LDATA->fogg = (s32)(fog_scale * 15.0f);
+            LDATA->fogb = 0;
+            LDATA->foga = 0x40;
+            haze_height = 3.0f - dx;
+            haze_scale = gauntletWobble / 3.0f;
+            LDATA->hazea = (u8)(s32)((haze_height < 0.0f) ? (haze_scale * 0.0f) : (haze_height * haze_scale));
+            distance_scale = gauntletFarOffset / 20.0f;
+            LDATA->fognear = dx;
+            LDATA->fogfar = -(20.0f - LDATA->fognear) * distance_scale + gauntletFarOffset + 20.0f;
+        }
+    }
+    if ((VEHICLECONTROL == 1) && (player->obj.vehicle == 0x20)) {
+        vec.y = NuTrigTable[(u16)(subprop / 0x3c)] * 0.15f + player->obj.pos.y;
+        dx = NuTrigTable[((u16)(subprop / 0x3c) + 0x4000) & 0xffff] * 0.15f + 0.8f;
+        vec.x = NuTrigTable[(player->obj.hdg + 0x5000) & 0xffff] * dx + player->obj.pos.x;
+        vec.z = NuTrigTable[(player->obj.hdg - 0x7000) & 0xffff] * dx + player->obj.pos.z;
+        AddVariableShotDebrisEffect(GDeb[22].i, &vec, 1, 0x4000, player->obj.hdg + 0xc000);
+        vec.x = NuTrigTable[(player->obj.hdg - 0x5000) & 0xffff] * dx + player->obj.pos.x;
+        vec.z = NuTrigTable[(player->obj.hdg - 0x1000) & 0xffff] * dx + player->obj.pos.z;
+        AddVariableShotDebrisEffect(GDeb[22].i, &vec, 1, 0x4000, player->obj.hdg + 0xc000);
+        subprop = JonMaskFPS(subprop, 35000);
+    }
+    if ((((Level == 0x22) || (Level == 6)) && ((player->tap != 0 || (player->spin != 0)))) && (VEHICLECONTROL == 2)) {
+        AddVariableShotDebrisEffect(GDeb[20].i, &player->obj.pos, 1, 0, 0);
+    }
+    if (Level == 0xb) {
+        vec.x = global_camera.mtx._30;
+        vec.y = global_camera.mtx._31 - 9.0f;
+        vec.z = global_camera.mtx._32;
+    }
+    if ((Level - 0xbU < 2) && ((jonframe1 & 1U) == 0)) {
+        vec.x = global_camera.mtx._30;
+        vec.y = global_camera.mtx._31;
+        vec.z = global_camera.mtx._32;
+        vec2.x = player->obj.pos.x - global_camera.mtx._30;
+        vec2.z = player->obj.pos.z - global_camera.mtx._32;
+        ang = NuAtan2D(vec2.x, vec2.z);
+        vec.x = NuTrigTable[ang & 0xffff] * 5.0f + vec.x;
+        vec.z = NuTrigTable[(ang + 0x4000) & 0xffff] * 5.0f + vec.z;
+        AddVariableShotDebrisEffect(GDeb[98].i, &vec, 1, 0, 0);
+    }
+    if (Level == 0x1a) {
+        dx = 10.0f;
+        for (loop = 0; loop < 4; loop++) {
+            vec.x = global_camera.mtx._30;
+            vec.y = global_camera.mtx._31;
+            vec.z = global_camera.mtx._32;
+            vec2.x = player->obj.pos.x - global_camera.mtx._30;
+            vec2.z = player->obj.pos.z - global_camera.mtx._32;
+            ang = NuAtan2D(vec2.x, vec2.z);
+            vec.x = NuTrigTable[ang & 0xffff] * dx + vec.x;
+            vec.z = NuTrigTable[(ang + 0x4000) & 0xffff] * dx + vec.z;
+            AddVariableShotDebrisEffect(GDeb[113].i, &vec, 1, 0, 0);
+        }
+    }
+    if (Level == 0xd) {
+        dx = NuFsqrt(torndist) * 0.25f;
+        if (dx < 30.0f) {
+            if (dx < 10.0f) {
+                key = 1;
+                count = (s32)((10.0f - dx) + 1.0f);
+                if (count > 5) {
+                    count = 5;
+                }
+            } else {
+                count = 1;
+                key = (s32)(dx / 10.0f);
+            }
+        } else {
+            count = 1;
+            key = 3;
+        }
+        if (((jonframe1 == (jonframe1 / (s32)key) * key) || (count != 1)) && (0 < count)) {
+            dx = 10.0f;
+            for (loop = count; loop != 0; loop--) {
+                vec.x = global_camera.mtx._30;
+                vec.y = global_camera.mtx._31;
+                vec.z = global_camera.mtx._32;
+                vec2.x = player->obj.pos.x - global_camera.mtx._30;
+                vec2.z = player->obj.pos.z - global_camera.mtx._32;
+                ang = NuAtan2D(vec2.x, vec2.z);
+                vec.x = (NuTrigTable[ang & 0xffff] * dx) + vec.x;
+                vec.z = (NuTrigTable[(ang + 0x4000) & 0xffff] * dx) + vec.z;
+                if ((qrand() & 7) != 0) {
+                    AddVariableShotDebrisEffect(GDeb[110].i, &vec, 1, 0, 0);
+                } else if ((jonframe1 & 1U) != 0) {
+                    AddVariableShotDebrisEffect(GDeb[111].i, &vec, 1, 0, 0);
+                } else {
+                    AddVariableShotDebrisEffect(GDeb[112].i, &vec, 1, 0, 0);
+                }
+            }
+        }
+    }
+    switch (Level) {
+      case 8:
+      case 0xe:
+      case 0x17:
+        if (Level != 8) {
+            water1 = water1 - 0x3c;
+            if (water1 < 0) {
+                if (qrand() < 0x8000) {
+                    water1 = ((qrand() & 0xff) + 0x3c) * 0x3c;
+                } else {
+                    water1 = ((qrand() & 0xf) + 10) * 0x3c;
+                }
+            }
+            if (water1 < 0xb4) {
+                if (0xb3 < water1 + 0x3c) {
+                    if (Level == 0xe) {
+                        GameSfx(0xbf, NULL);
+                    } else {
+                        GameSfx(0xbb, NULL);
+                    }
+                }
+                LDATA->fogr = 0x7f;
+                LDATA->fogg = 0x7f;
+                LDATA->fogb = 0x7f;
+                LDATA->foga = 0x4c;
+                LDATA->fognear = 0.1f;
+                LDATA->fogfar = 10.0f;
+            } else {
+                LDATA->fogr -= 8;
+                if ((LDATA->fogr & 0x80) != 0) {
+                    LDATA->fogr = 0;
+                }
+                LDATA->fogg -= 8;
+                if ((char)LDATA->fogg < 6) {
+                    LDATA->fogg = 6;
+                }
+                LDATA->fogb -= 8;
+                if ((char)LDATA->fogb < 0x21) {
+                    LDATA->fogb = 0x21;
+                }
+                LDATA->foga = 0x4c;
+                LDATA->fognear += 2.0f;
+                if (LDATA->fognear > 4.0f) {
+                    LDATA->fognear = 4.0f;
+                }
+                LDATA->fogfar += 10.0f;
+                if (LDATA->fogfar > 100.0f) {
+                    LDATA->fogfar = 100.0f;
+                }
+            }
+        } else {
+            if (VEHICLECONTROL != 0) {
+                NuBridgeOn(0);
+            } else {
+                NuBridgeOn(1);
+            }
+        }
+        vec.x = global_camera.mtx._30;
+        vec.y = global_camera.mtx._31 + 3.0f;
+        vec.z = global_camera.mtx._32;
+        vec2.x = player->obj.pos.x - global_camera.mtx._30;
+        vec2.z = player->obj.pos.z - global_camera.mtx._32;
+        ang = NuAtan2D(vec2.x, vec2.z);
+        vec.x = NuTrigTable[ang & 0xffff] * 5.0f + vec.x;
+        vec.z = NuTrigTable[(ang + 0x4000) & 0xffff] * 5.0f + vec.z;
+        vec.y = vec.y + 100.0f;
+        dy = NewShadow(&vec, 0.0f);
+        vec.y -= 100.0f;
+        if (vec.y > dy) {
+            AddVariableShotDebrisEffect(GDeb[95].i, &vec, 0x10, -0x8000, 0);
+        }
+        if ((Level == 0x17) || ((Level == 8 && (VEHICLECONTROL != 0)))) {
+            g = 1;
+            temp = 8192.0f;
+        } else {
+            if (Level == 0x17) {
+                g = 4;
+                temp = 4096.0f;
+            } else if (Level == 0xe) {
+                g = 2;
+                temp = 4096.0f;
+            } else if (Level == 8) {
+                if ((((float)qrand()) * 0.000015259022f) > 0.6) {
+                    g = 1;
+                } else {
+                    g = 0;
+                }
+                temp = 4096.0f;
+            }
+        }
+        if (g != 0) {
+            for (loop = g; loop != 0; loop--) {
+                vec.x = player->obj.pos.x + (float)(qrand() - 0x8000) / temp;
+                vec.y = player->obj.pos.y + 10.0f;
+                vec.z = player->obj.pos.z + (float)(qrand() - 0x8000) / temp;
+                vec.y = NewShadow(&vec, 0.0f);
+                if (vec.y != 2000000.0f) {
+                    vec.y -= 0.2f;
+                    key = -1;
+                    AddFiniteShotDebrisEffect(&key, GDeb[96].i, &vec, 1);
+                }
+            }
+        }
+        break;
+    }
+    pt = rockpt;
+    if (pt != NULL) {
+        if (*pt != 9999.0f) {
+            do {
+                temp = pt[3];
+                pt[3] = (temp - 1.0f);
+                if (pt[3] <= 0.0f) {
+                    pt[3] = (pt[3] + ((pt[4] * 60.0f) / 60.0f));
+                }
+                vec.x = *pt;
+                vec.y = pt[1];
+                vec.z = pt[2];
+                dx = player->obj.pos.x - vec.x;
+                dy = player->obj.pos.y - vec.y;
+                dz = player->obj.pos.z - vec.z;
+                if ((pt[0xb] < 0.0f) || (dx * dx + dy * dy + dz * dz < (pt[0xb] * pt[0xb]))) {
+                    for (loop = 1; (float)loop <= pt[5]; loop++) {
+                        if ((temp > pt[6] * (float)loop) && (pt[3] <= pt[6] * (float)loop)) {
+                            AddDeb3Ang(&vec, (s32)pt[7], (s32)pt[8], NULL, (s32)pt[9], (s32)pt[10]);
+                            if (rockpt == (float*)HotRocks) {
+                                GameSfx(0x85, &vec);
+                            }
+                            break;
+                        }
+                    }
+                }
+                pt = pt + 0xc;
+            } while (*pt != 9999.0f);
+        }
+        if (rockpt == (float*)HotRocks) {
+            loop = pVIS - world_scene[0]->splines;
+            if (((loop == 1) && (0x6b < iVIS))
+                && (hutexplode == 0))
+            {
+                hutexplode = 1;
+                for (loop = 0; HutList[loop] != NULL; loop++) {
+                    if (NuSpecialFind(world_scene[0], &obj, HutList[loop]) != 0) {
+                        StartHGobjAnim(&obj);
+                    }
+                }
+            }
+            if (hutexplode > 0) {
+                key = hutexplode;
+                hutexplode += 0x3c;
+                if (hutexplode >= 0x4b0) {
+                    vec.x = 11.94f;
+                    vec.y = 2.12f;
+                    vec.z = -42.61f;
+                    if (key <= 0x4af) {
+                        exkey = -1;
+                        AddFiniteShotDebrisEffect(&exkey, GDeb[43].i, &vec, 1);
+                        exroty = 0xf0000;
+                        GameSfx(0xbd, NULL);
+                        NewRumble(&player->rumble, 0xff);
+                        NewBuzz(&player->rumble, 0xc);
+                    }
+                    hutexplode = 0x708;
+                    hutframe += 0x3c;
+                    if (hutframe > 0xf0) {
+                        hutframe -= 0xf0;
+                        AddVariableShotDebrisEffect(GDeb[42].i, &vec, 1, 0, 0);
+                    }
+                    if (exroty > 0) {
+                        DebrisEmitterOrientation(exkey, 0x1000, (short)(exroty / 0x3c));
+                        exroty = exroty - 0x1e000;
+                    }
+                }
+            }
+            if ((iVIS - 0xcaU < 0x1b) && (pVIS != NULL)) {
+                dropfire = 600;
+            }
+            dropfire -= 0x3c;
+            if (dropfire < 1) {
+                vec.x = (s32)(qrand() - 0x8000U) * 0.00012207031f + player->obj.pos.x;
+                vec.y = player->obj.pos.y + 10.0f;
+                vec.z = ((s32)(qrand() - 0x8000U) * 0.00012207031f + player->obj.pos.z);
+                vec.y = NewShadow(&vec, 0.0f);
+                if (vec.y != 2000000.0f) {
+                    if (vec.y < 0.0f) {
+                        firedrop[firedroppt].type = 0x29;
+                        vec.y = 0.0f;
+                    } else {
+                        firedrop[firedroppt].type = 0x28;
+                    }
+                    firedrop[firedroppt].time = 3600.0f;
+                    firedrop[firedroppt].pos = vec;
+                    firedroppt = firedroppt + 1 & 0xf;
+                    vec.y += 10.0f;
+                    AddVariableShotDebrisEffect(GDeb[39].i, &vec, 1, -0x8000, 0);
+                    dropfire = 600;
+                } else {
+                    dropfire = 0x3c;
+                }
+            }
+            for (loop = 0; loop < 0x10; loop++) {
+                if ((firedrop[loop].time != 0.0f) && (firedrop[loop].time -= 60.0f, firedrop[loop].time <= 0.0f)) {
+                    firedrop[loop].time = 0.0f;
+                    key = -1;
+                    AddFiniteShotDebrisEffect(&key, GDeb[firedrop[loop].type].i, &firedrop[loop].pos, 1);
+                    if (NuCameraClipTestPoints(&firedrop[loop].pos, 1, NULL) == 0) {
+                        if (firedrop[loop].type == 0x28) {
+                            GameSfx(0x9c, &firedrop[loop].pos);
+                        } else {
+                            GameSfx(0x85, &firedrop[loop].pos);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (Level == 8) {
+        rsfxpt = (s32*)rsfxJung;
+    }
+    PlayRandSFX();
 }
 
 //NGC MATCH

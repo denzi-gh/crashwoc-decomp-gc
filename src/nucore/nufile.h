@@ -134,7 +134,7 @@ s32 NuFileRead(fileHandle handle, void* data, s32 size);
 void NuStartLoadScreen(s32 screen);
 
 // Stop the loading screen.
-void NuStopLoadScreen(void);
+void NuStopLoadScreen(s32 screen);
 
 // Read a float from a file.
 f32 NuFileReadFloat(fileHandle handle);

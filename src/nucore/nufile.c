@@ -414,7 +414,7 @@ void NuStartLoadScreen(s32 screen) {
 }
 
 //NGC MATCH
-void NuStopLoadScreen() {
+void NuStopLoadScreen(s32 screen) {
 	loadscreen = -1;
 	loadscreenfadedir = 0;
 

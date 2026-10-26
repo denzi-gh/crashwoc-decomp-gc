@@ -1518,7 +1518,7 @@ s32 DebrisCollisionCheck(struct nuvec_s *centre, float radius) {
     return -1;
 }
 
-//94.67% NGC
+//NGC MATCH
 void Debris(s32 pause) {
     s32 lp;
     s32 i;
@@ -1529,23 +1529,27 @@ void Debris(s32 pause) {
     struct debris_chunk_control_s *next_chunk;
     struct debris_chunk_control_s* current_chunk;
     float camdist;
-    s32 iVar10;
     float quad1;
     float quad2;
     s32 bVar22;
+    // GameCube particles follow the DMA words without the legacy unpack header.
+    struct gc_debris_chunk_s {
+        s32 dmadata[2];
+        struct uv1deb debris[32];
+    };
 
     if ((render_debris_enabled == 0) || (pause != 0)) {
         return;
     }
 
-    globaltime += 0.01666667f;
+    globaltime += 1.0f / 60.0f;
     globalframes++;
 
     for (current_deb_key = debris_emitter_stack[debris_emitter_stack_index]; current_deb_key != NULL;
          current_deb_key = next_deb_key)
     {
-        debinfo = debtab[current_deb_key->type];
         next_deb_key = current_deb_key->next;
+        debinfo = debtab[current_deb_key->type];
         if ((current_deb_key->trigger_type != 0)
             && ((current_deb_key->trigger_type == 1) && (current_deb_key->trigger_id != -1)))
         {
@@ -1559,11 +1563,11 @@ void Debris(s32 pause) {
         }
 
         if ((debinfo != NULL) && (debinfo->numspheres != 0)) {
-            for (i = 0; i < debinfo->numspheres; i++) {
-                if (current_deb_key->spheres[i].t != -1.0f) {
-                    current_deb_key->spheres[i].t += 0.01666667f;
-                    if (current_deb_key->spheres[i].t > debinfo->etime) {
-                        current_deb_key->spheres[i].t = -1.0f;
+            for (lp = 0; lp < debinfo->numspheres; lp++) {
+                if (current_deb_key->spheres[lp].t != -1.0f) {
+                    current_deb_key->spheres[lp].t += 1.0f / 60.0f;
+                    if (current_deb_key->spheres[lp].t > debinfo->etime) {
+                        current_deb_key->spheres[lp].t = -1.0f;
                     }
                 }
             }
@@ -1621,21 +1625,19 @@ void Debris(s32 pause) {
             current_deb_key->delay = 1;
             current_deb_key->oncount--;
             if (current_deb_key->oncount == 0) {
-                // inline (?)
-                double _yy;
-                _yy = randy();
-                current_deb_key->delay += debinfo->ival_off + (s32)((float)debinfo->ival_off_ran * 0.125 * _yy);
-                _yy = randy();
-                current_deb_key->oncount = debinfo->ival_on + (s32)((float)debinfo->ival_on_ran * 0.125 * _yy);
-                for (i = 0; i < 4; i++) {
-                    if (debinfo->sounds[i].id == -1) {
+                current_deb_key->delay += debinfo->ival_off
+                    + (s32)(randy() * ((float)debinfo->ival_off_ran * 4.656612873077393e-10));
+                current_deb_key->oncount = debinfo->ival_on
+                    + (s32)(randy() * ((float)debinfo->ival_on_ran * 4.656612873077393e-10));
+                for (lp = 0; lp < 4; lp++) {
+                    if (debinfo->sounds[lp].id == -1) {
                         continue;
                     }
 
-                    if (debinfo->sounds[i].type == 1) {
-                        current_deb_key->sound_next[i] = current_deb_key->delay;
-                    } else if (debinfo->sounds[i].type == 2) {
-                        current_deb_key->sound_next[i] = current_deb_key->delay + current_deb_key->oncount - 1;
+                    if (debinfo->sounds[lp].type == 1) {
+                        current_deb_key->sound_next[lp] = current_deb_key->delay;
+                    } else if (debinfo->sounds[lp].type == 2) {
+                        current_deb_key->sound_next[lp] = current_deb_key->delay + current_deb_key->oncount - 1;
                     }
                 }
                 if (current_deb_key->instances != 0) {
@@ -1652,21 +1654,21 @@ void Debris(s32 pause) {
             RemoveDebrisEffectFromStack(current_deb_key, debris_emitter_stack + debris_emitter_stack_index);
             AddDebrisEffectToStack(current_deb_key, &debris_emitter_stack[(debris_emitter_stack_index + 1) & 0x1F]);
             current_deb_key->delay--;
-            for (i = 0; i < 4; i++) {
-                current_deb_key->sound_next[i]--;
+            for (lp = 0; lp < 4; lp++) {
+                current_deb_key->sound_next[lp]--;
             }
         } else if (current_deb_key->delay > 0x1f) {
             current_deb_key->delay -= 0x20;
-            for (i = 0; i < 4; i++) {
-                current_deb_key->sound_next[i] -= 0x20;
+            for (lp = 0; lp < 4; lp++) {
+                current_deb_key->sound_next[lp] -= 0x20;
             }
         } else {
             RemoveDebrisEffectFromStack(current_deb_key, &debris_emitter_stack[debris_emitter_stack_index]);
             AddDebrisEffectToStack(
                 current_deb_key, &debris_emitter_stack[(debris_emitter_stack_index + current_deb_key->delay) & 0x1F]
             );
-            for (i = 0; i < 4; i++) {
-                current_deb_key->sound_next[i] -= current_deb_key->delay;
+            for (lp = 0; lp < 4; lp++) {
+                current_deb_key->sound_next[lp] -= current_deb_key->delay;
             }
             current_deb_key->delay = 0;
         }
@@ -1676,14 +1678,13 @@ void Debris(s32 pause) {
     
     for (current_chunk = debris_chunk_control_stack[debris_chunk_control_stack_index]; current_chunk != NULL; current_chunk = next_chunk)
     {
-        // iVar10 = debris_chunk_control_stack_index;
         next_chunk = current_chunk->next;
         if (current_chunk->delay == 0) {
             // dVar7 = current_chunk->action;
             if (current_chunk->action == DEBRIS_CHUNK_CONTROL_DO_BOUNCEY) {
                 float omy, nmy, ttime;
                 debinfo = debtab[current_chunk->type];
-                deb = &current_chunk->chunk->debris[current_chunk->ivariable];
+                deb = &((struct gc_debris_chunk_s*)current_chunk->chunk)->debris[current_chunk->ivariable];
                 bVar22 = 0;
                 nmy = (current_chunk->fvariable * debinfo->grav * 2);
                 omy = deb->my;
@@ -1692,7 +1693,7 @@ void Debris(s32 pause) {
                 deb->y -= ((deb->my * current_chunk->fvariable) - ttime);
                 if (SolveQuadratic(debinfo->grav, deb->my, deb->y - current_chunk->refoff, &quad1, &quad2) != 0) {
                     
-                    if ((quad1 > quad2) && (quad1 < debinfo->etime) || !(quad2 < debinfo->etime))  {
+                    if (((quad1 > quad2) ? quad1 : quad2) < debinfo->etime) {
                         current_chunk->delay = (s32)((((quad1 > quad2) ? quad1 : quad2) - current_chunk->fvariable) * 60.0f);
                         current_chunk->fvariable = (quad1 > quad2) ? quad1 : quad2;
                         if (current_chunk->delay == 0) {
@@ -1728,7 +1729,7 @@ void Debris(s32 pause) {
             } else if (current_chunk->action == DEBRIS_CHUNK_CONTROL_DO_BOUNCEXZ) {
                 struct nuvec_s tvec = { 1.0f, 0.0f, 0.0f};
                 float omz, omx, tcalc, nmx, nmz;
-                deb = &current_chunk->chunk->debris[current_chunk->ivariable];
+                deb = &((struct gc_debris_chunk_s*)current_chunk->chunk)->debris[current_chunk->ivariable];
                 
                 NuVecRotateY(&tvec, &tvec, (s32)current_chunk->refroty);
                 
@@ -1760,7 +1761,7 @@ void Debris(s32 pause) {
                 freechunkcontrols[freechunkcontrolsptr] = current_chunk;
                 current_chunk->chunk = NULL;
             } else if (current_chunk->action == DEBRIS_CHUNK_CONTROL_SORT_DMA) {
-                LinkDmaParticalSets((s32**)current_chunk, 1);
+                LinkDmaParticalSets((s32**)&current_chunk->chunk, 1);
                 RemoveChunkControlFromStack(
                     current_chunk, &debris_chunk_control_stack[debris_chunk_control_stack_index]
                 );
@@ -1788,16 +1789,16 @@ void Debris(s32 pause) {
                 current_chunk->action = DEBRIS_CHUNK_CONTROL_RETURN_TO_STACK;
                 current_chunk->delay = 0;
             } else if (current_chunk->action == DEBRIS_CHUNK_CONTROL_FREE_AND_UNLINK) {
-                int r = current_chunk->owner->count;
-                for (i = 0; i < current_chunk->owner->count; i++) {
-                    if (current_chunk->owner->chunks[i] == current_chunk->chunk) {
-                        r = i;
+                int r = 0;
+                for (lp = 0; lp < current_chunk->owner->count; lp++) {
+                    if (current_chunk->owner->chunks[lp] == current_chunk->chunk) {
+                        r = lp;
                         break;
                     }
                 }
-                    for (; r < current_chunk->owner->count - 1; r++) {
-                        current_chunk->owner->chunks[r] = current_chunk->owner->chunks[r + 1];
-                    }
+                for (lp = r; lp < current_chunk->owner->count - 1; lp++) {
+                    current_chunk->owner->chunks[lp] = current_chunk->owner->chunks[lp + 1];
+                }
                 
                 current_chunk->owner->chunks[current_chunk->owner->count - 1] = NULL;
                 current_chunk->owner->count = current_chunk->owner->count - 1;
@@ -1812,18 +1813,18 @@ void Debris(s32 pause) {
                 }
                 
                 if (current_chunk->owner->count > 0) {
-                    LinkDmaParticalSets(current_chunk->owner, current_chunk->owner->count);
+                    LinkDmaParticalSets((s32**)current_chunk->owner->chunks, current_chunk->owner->count);
                 } else {
                     current_chunk->owner->chunks[0] = NULL;
                 }
                 
-                if (iVar10 == 0) {
-                    for (i = 0; i < 0x100; i++) {
-                        if (ParticleChunkRenderStack[i].chunk == current_chunk->chunk) {
-                            ParticleChunkRenderStack[i].chunk = current_chunk->owner->chunks[0];
+                if (r == 0) {
+                    for (lp = 0; lp < 0x100; lp++) {
+                        if (ParticleChunkRenderStack[lp].chunk == current_chunk->chunk) {
+                            ParticleChunkRenderStack[lp].chunk = current_chunk->owner->chunks[0];
                             if (current_chunk->owner->count == 0) {
-                                ParticleChunkRenderStack[i].debinfo = NULL;
-                                ParticleChunkRenderStack[i].debdata = NULL;
+                                ParticleChunkRenderStack[lp].debinfo = NULL;
+                                ParticleChunkRenderStack[lp].debdata = NULL;
                             }
                             break;
                         }
