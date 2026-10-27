@@ -89,7 +89,7 @@ void DrawPanelDebris(void);
 void LoadWumpa(void);
 void ResetWumpa(void);
 void FlyWumpa(struct wumpa_s* wumpa);
-s32 Draw3DCharacter(struct nuvec_s *pos,u16 xrot,u16 yrot,u16 zrot,struct CharacterModel *model, s32 action,float scale,float anim_time, s32 rot);
+s32 Draw3DCharacter(struct nuvec_s *pos,u16 xrot,u16 yrot,u16 zrot,float scale,struct CharacterModel *model, s32 action,float anim_time, s32 rot);
 u16 TurnRot(u16 a0, u16 a1, s32 rate);
 s32 AheadOfCheckpoint(s32 iRAIL,s32 iALONG,float fALONG);
 void NewGame(void);

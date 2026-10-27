@@ -193,31 +193,31 @@ s32 NuCameraClipTestExtents(struct nuvec_s* min, struct nuvec_s* max, const stru
     struct nuvec_s src[8];
     struct nuvec_s dest[8];
     s32 k;
-    s32 iVar2;
-    s32 iVar6;
-    s32 iVar4;
-    s32 j;
+    s32 x;
+    s32 y;
+    s32 z;
+    s32 result;
     char oc[8];
 
     if (clip_enable == 0) {
-        k = 1;
+        return 1;
     } else {
-        j = 0;
+        k = 0;
         ext[0] = min;
         ext[1] = max;
-        for (iVar2 = 0; iVar2 < 2; iVar2++) {
-            for (iVar6 = 0; iVar6 < 2; iVar6++) {
-                for (iVar4 = 0; iVar4 < 2; iVar4++) {
-                    src[j].x = ext[iVar2]->x;
-                    src[j].y = ext[iVar6]->y;
-                    src[j].z = ext[iVar4]->z;
-                    j++;
+        for (x = 0; x < 2; x++) {
+            for (y = 0; y < 2; y++) {
+                for (z = 0; z < 2; z++) {
+                    src[k].x = ext[x]->x;
+                    src[k].y = ext[y]->y;
+                    src[k].z = ext[z]->z;
+                    k++;
                 }
             }
         }
 
         NuCameraTransformView(dest, src, 8, wm);
-        memset(oc, 0, sizeof(oc));
+        memset(oc, 0, 8);
         for (k = 0; k < 8; k++) {
             if (dest[k].z < global_camera.nearclip) {
                 oc[k] = oc[k] | 1;
@@ -239,15 +239,15 @@ s32 NuCameraClipTestExtents(struct nuvec_s* min, struct nuvec_s* max, const stru
             }
         }
         if ((oc[0] & oc[1] & oc[2] & oc[3] & oc[4] & oc[5] & oc[6] & oc[7]) == 0) {
-            k = 1;
+            result = 1;
             if ((oc[0] | oc[1] | oc[2] | oc[3] | oc[4] | oc[5] | oc[6] | oc[7]) != 0) {
-                k = 2;
+                result = 2;
             }
         } else {
-            k = 0;
+            result = 0;
         }
     }
-    return k;
+    return result;
 }
 
 //MATCH GCN

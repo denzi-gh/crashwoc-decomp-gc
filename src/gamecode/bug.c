@@ -288,14 +288,11 @@ void AddBugLight(void) {
 }
 
 
-void DrawBug(void)
-
-{
-  ushort xrot;
-  
+//NGC MATCH
+void DrawBug(void) {
   if ((Level == 0x1b) && (CRemap[174] != -1)) {
-    Draw3DCharacter(&bug_pos, xrot, bug_xrot, (bug_yrot - 0x8000) & 0xffff,
-                    &CModel[CRemap[174]], BugAnim.action, 1.25f, BugAnim.anim_time, 0);
+    Draw3DCharacter(&bug_pos,bug_xrot,bug_yrot + 0x8000,0,1.25f,
+                    &CModel[CRemap[174]],BugAnim.action,BugAnim.anim_time,0);
   }
   return;
 }

@@ -111,7 +111,7 @@ struct nuanimdata_s * NuAnimDataLoadBuff(char *file,union variptr_u *buff,union 
   buff->voidptr = mem;
   addroff = NuFileLoadBuffer(file,mem,(s32)endbuff->voidptr - (s32)mem);
   if (addroff == 0) {
-    NuErrorProlog("..\\nu2.ps2\\nu3d\\nuanim.c",0x2f1)("Could not read from <%s>, either file is not there or the buffer may be full",file);
+    NuErrorProlog("..\\nu2.ps2\\nu3d\\nuanim.c",0xb6e)("Could not read from <%s>, either file is not there or the buffer may be full",file);
   }
 
   dathdr = (struct NUANIMDATAHDR_s *)buff->voidptr;
@@ -191,7 +191,7 @@ struct nuanimdatachunk_s * NuAnimDataChunkCreate (s32 numnodes) {
   struct nuanimdatachunk_s *animdata;
 
   if (numnodes < 1) {
-    NuErrorProlog("..\\nu2.ps2\\nu3d\\nuanim.c",0x275)("assert");
+    NuErrorProlog("..\\nu2.ps2\\nu3d\\nuanim.c",0x253)("assert");
   }
   animdata = (struct nuanimdatachunk_s *)NuMemAlloc(0x14);	//animdata = (struct nuanimdatachunk_s *)NuMemAllocFn(0x14,"..\\nu2.ps2\\nu3d\\nuanim.c",0x276);
 

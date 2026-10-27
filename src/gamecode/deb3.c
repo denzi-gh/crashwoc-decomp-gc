@@ -650,7 +650,7 @@ void JonExtraDraw(void) {
         vec.y += (NuTrigTable[(u16)(masky / 0x3c)] * 0.75f);
         vec.z = NuTrigTable[(u16)((maskx / 0x3c) + 0x4000)] * 3.0f + vec.z;
         if (i != -1) {
-            Draw3DCharacter(&vec, 0, (u16)(NuTrigTable[(u16)(maskrot / 0x3c)] * 8192.0f), 0, &CModel[i], -1, 1.0f, 1.0f, 0);
+            Draw3DCharacter(&vec, 0, (u16)(NuTrigTable[(u16)(maskrot / 0x3c)] * 8192.0f), 0, 1.0f, &CModel[i], -1, 1.0f, 0);
             vec.y += 0.2f;
             if (Paused == 0) {
                 AddVariableShotDebrisEffect(GDeb[d].i, &vec, 1, 0, 0);

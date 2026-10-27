@@ -46,6 +46,7 @@ struct debkeydatatype_s **FindDebrisEffectStack(struct debkeydatatype_s *effect)
 void RemoveDebrisEffectFromStack(struct debkeydatatype_s *effect, struct debkeydatatype_s **stack);
 void AddDebrisEffect(s32 *key, s32 type, float x, float y, float z);
 float CameraEmitterDistance(struct nuvec_s *vec);
+void NuRndrParticleGroup(struct _sceDmaTag *data, struct PartHeader_testretail *setup, struct numtl_s *mtl, float time, struct numtx_s *wm);
 
 #define RAND_MAX (2147483647)
 

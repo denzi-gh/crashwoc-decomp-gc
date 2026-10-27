@@ -20,7 +20,8 @@ s32 GS_MaterialSourceEmissive;
 s32 GS_EnableColorVertexFlag;
 s32 GS_EnableSpecularFlag;
 
-void MatReorder(struct _GSMATRIX *MatrixA);
+void MatReorder();
+void GS_SetLightingMatrix(struct _GSMATRIX *mtx);
 void GXSetChanAmbColor(enum _GXChannelID chan, struct _GXColor amb_color);
 void GXSetChanMatColor(enum _GXChannelID chan, struct _GXColor mat_color);
 void GXSetNumChans(unsigned char nChans);

@@ -4,21 +4,21 @@ WIP
 AddAward 99% (regswap)
 DrawAwards MATCH (check)
 UpdateWumpa MATCH
-UpdateMask  95% (regswap)
+UpdateMask 99.79% (regswap)
 ProcMenu 99% (merge)
 GameTiming MATCH
 NewLevelTime MATCH
-BonusTiming 98% (regswap)
+BonusTiming MATCH
 DrawProbeFX  85.32% (scheduling/regswap)
 Draw3DObject MATCH
 DrawMenu 84%*
 
 HubDrawItems 89%
-ToggleVehicle 73%
+ToggleVehicle MATCH
 HubSelect   83%
 HubLevelSelect   90%
-InitVehicleToggles 76%**
-ResetVehicleControl 76%**
+InitVehicleToggles MATCH
+ResetVehicleControl MATCH
 BonusTransporter   93%
 DeathTransporter    88%
 GemPathTransporter  96%
@@ -758,7 +758,7 @@ void JonProbe(void) {
             }
         }
         if (CRemap[177] != -1) {
-            Draw3DCharacter(&probepos, proberot.x, proberot.y, proberot.z, &CModel[CRemap[177]], -1, 1.0f, 1.0f, 0);
+            Draw3DCharacter(&probepos, proberot.x, proberot.y, proberot.z, 1.0f, &CModel[CRemap[177]], -1, 1.0f, 0);
         }
         vol = (s32)(16383.0f - (NuVecDist(&probepos, &oldpos, NULL) * 16383.0f) / 0.050000004f);
         if (vol  > 0) {
@@ -1407,7 +1407,7 @@ void HubDrawItems(void) {
                     chr = (s32)CRemap[character];
                     if (chr != -1) {
                         yrot = (u16)NuAtan2D(pt_b->x - pt_a->x, pt_b->z - pt_a->z);
-                        Draw3DCharacter(pt_a, 0, yrot, 0, &CModel[chr], -1, 0.77f, 1.0f, 0);
+                        Draw3DCharacter(pt_a, 0, yrot, 0, 0.77f, &CModel[chr], -1, 1.0f, 0);
                     }
                 }
             }
@@ -2037,8 +2037,8 @@ s32 Draw3DObject(s32 object,struct nuvec_s *pos,u16 xrot,u16 yrot,u16 zrot,float
 }
 
 //MATCH NGC
-s32 Draw3DCharacter(struct nuvec_s *pos,u16 xrot,u16 yrot,u16 zrot,struct CharacterModel *model,
-                    s32 action,float scale,float anim_time, s32 rot) {
+s32 Draw3DCharacter(struct nuvec_s *pos,u16 xrot,u16 yrot,u16 zrot,float scale,struct CharacterModel *model,
+                    s32 action,float anim_time, s32 rot) {
     s32 i;
     struct numtx_s m;
     struct nuvec_s s;
@@ -2258,150 +2258,153 @@ void DrawMaskFeathers(void) {
 
 #define ABS(x) (x >= 0 ? x : -x)
 
-//95% NGC (FIX)
-void UpdateMask(struct mask_s* mask, struct obj_s* obj) {
+//NGC: remaining register allocation differences
+void UpdateMask(struct mask_s *mask, struct obj_s *obj) {
     struct nuvec_s v;
-    struct nuvec_s local_40;
-    u16 uVar10;
-    u16 unaff_r29;
-    s32 bVar7;
-    s32 iVar8;
+    struct nuvec_s oldpos;
+    struct numtx_s *mtx;
     float dx;
-    s32 uVar13;
-    u16 sVar14;
-    u16 xrot;
-    u16 yrot;
     float dz;
-    float f;
-    float y;
-    float mul;
-    struct numtx_s* mtx;
+    float dist;
+    float wibble;
+    float below;
+    s32 diff;
+    s32 locked;
+    s32 i;
+    s32 turn_speed;
+    u16 target;
+    u16 yrot;
+    u16 xrot;
 
     if (CRemap[3] == -1) {
         return;
     }
-    if ((obj->idle_gametime > 0.0f) && (Cursor.menu != 0x24)) {
-        mask->idle_time += 0.01666667f;
+    if (obj->idle_gametime > 0.0f && Cursor.menu != 0x24) {
+        mask->idle_time += 0.016666668f;
         if (mask->idle_time >= mask->idle_duration) {
+            float rnd;
+
             do {
-                iVar8 = qrand() / 0x5556;
-            } while (iVar8 == mask->idle_mode);
-            mask->idle_mode = iVar8;
+                i = qrand() / 0x5556;
+            } while (i == mask->idle_mode);
+            mask->idle_mode = i;
             mask->idle_time = 0.0f;
-            mul = qrand() * 0.000015259022f;
-            mask->idle_duration = mul + mul + 3.0f;
+            rnd = qrand() * 1.5259022e-05f;
+            mask->idle_duration = rnd + rnd + 3.0f;
         }
     } else {
+        float rnd;
+
         mask->idle_mode = 0;
         mask->idle_time = 0.0f;
-        mul = qrand() * 0.000015259022f;
-        mask->idle_duration = mul + mul + 3.0f;
+        rnd = qrand() * 1.5259022e-05f;
+        mask->idle_duration = rnd + rnd + 3.0f;
     }
-    dx = (obj->pos).x - (mask->pos).x;
-    dz = (obj->pos).z - (mask->pos).z;
-    dz = NuFsqrt(dx * dx + dz * dz);
+    dx = obj->pos.x - mask->pos.x;
+    dz = obj->pos.z - mask->pos.z;
+    dist = NuFsqrt(dx * dx + dz * dz);
     if (Cursor.menu == 0x24) {
-        (mask->newpos).x = GameCam->pos.x + GameCam->vZ.x + GameCam->vX.x * 0.25f;
-        (mask->newpos).y = GameCam->pos.y + GameCam->vZ.y + GameCam->vX.y * 0.25f;
-        (mask->newpos).z = GameCam->pos.z + GameCam->vZ.z + GameCam->vX.z * 0.25f;
+        mask->newpos.x = GameCam[0].vX.x * 0.25f + (GameCam[0].pos.x + GameCam[0].vZ.x);
+        mask->newpos.y = GameCam[0].vX.y * 0.25f + (GameCam[0].pos.y + GameCam[0].vZ.y);
+        mask->newpos.z = GameCam[0].vX.z * 0.25f + (GameCam[0].pos.z + GameCam[0].vZ.z);
     } else {
-        if (best_cRPos != NULL) {
-            uVar10 = best_cRPos->angle;
-            uVar13 = RotDiff(obj->hdg, uVar10);
-            if ((best_cRPos->mode & 3) != 0) {
+        if (best_cRPos != 0) {
+            target = best_cRPos->angle;
+            diff = RotDiff(obj->hdg, target);
+            if (best_cRPos->mode & 3) {
                 if (best_cRPos->fACROSS > 0.5f) {
-                    uVar10 -= 0x4000;
-                    if (ABS(uVar13) > 0x4000) {
-                        unaff_r29 = uVar10 + 0x1555;
+                    target -= 0x4000;
+                    if (ABS(diff) > 0x4000) {
+                        target += 0x1555;
                     } else {
-                        unaff_r29 = uVar10 - 0x1555;
+                        target -= 0x1555;
                     }
                 } else {
-                    uVar10 += 0x4000;
-                    if (ABS(uVar13) > 0x4000) {
-                        unaff_r29 = uVar10 - 0x1555;
+                    target += 0x4000;
+                    if (ABS(diff) > 0x4000) {
+                        target -= 0x1555;
                     } else {
-                        unaff_r29 = uVar10 + 0x1555;
+                        target += 0x1555;
                     }
                 }
-            } else if ((best_cRPos->mode & 4) != 0) {
-                sVar14 = uVar10 + 0x4000;
-                if (ABS(uVar13) < 0x4000) {
-                    unaff_r29 = sVar14 + 0x2000;
+            } else if (best_cRPos->mode & 4) {
+                target += 0x4000;
+                if (ABS(diff) < 0x4000) {
+                    target += 0x2000;
                 } else {
-                    unaff_r29 = uVar10 - 0x2000;
+                    target -= 0x2000;
                 }
-            } else if ((best_cRPos->mode & 8) != 0) {
-                sVar14 = uVar10 + 0xc000;
-                if (0x3fff < ABS(uVar13)) {
-                    unaff_r29 = sVar14 + 0x2000;
-                }
-                else
-                {
-                    unaff_r29 = uVar10 - 0x2000;
+            } else if (best_cRPos->mode & 8) {
+                target -= 0x4000;
+                if (ABS(diff) < 0x4000) {
+                    target -= 0x2000;
+                } else {
+                    target += 0x2000;
                 }
             } else {
-                goto LAB_800306cc;
+                goto face_camera;
             }
         } else {
-        LAB_800306cc:
-            sVar14 = NuAtan2D(GameCam->pos.x - (mask->pos).x, GameCam->pos.z - (mask->pos).z);
-            if (RotDiff(GameCam->yrot, obj->hdg) < 0) {
-                unaff_r29 = sVar14 - 0x2000;
+        face_camera:
+            target = NuAtan2D(GameCam[0].pos.x - mask->pos.x, GameCam[0].pos.z - mask->pos.z);
+            if (RotDiff(GameCam[0].yrot, obj->hdg) < 0) {
+                target -= 0x2000;
             } else {
-                unaff_r29 = sVar14 + 0x2000;
+                target += 0x2000;
             }
         }
-        mask->angle = TurnRot(mask->angle, unaff_r29, 0x444);
-        (mask->newpos).x = NuTrigTable[mask->angle] * 0.7f + (obj->pos).x;
-        (mask->newpos).y = obj->top * obj->SCALE + (obj->pos).y;
-        if (1.0f > dz) {
-            (mask->newpos).y -= 0.1f;
-        } else if (1.5f > dz) {
-            (mask->newpos).y -= ((dz - 1.0f) + (dz - 1.0f)) * 0.2f + 0.1f;
+        mask->angle = TurnRot(mask->angle, target, 0x444);
+        mask->newpos.x = obj->pos.x + NuTrigTable[mask->angle] * 0.7f;
+        mask->newpos.y = obj->pos.y + obj->top * obj->SCALE;
+        if (dist < 1.0f) {
+            mask->newpos.y -= 0.1f;
+        } else if (dist < 1.5f) {
+            mask->newpos.y -= ((dist - 1.0f) + (dist - 1.0f)) * 0.2f + 0.1f;
         } else {
-            (mask->newpos).y -= 0.3f;
+            mask->newpos.y -= 0.3f;
         }
-        (mask->newpos).z = (obj->pos).z + (NuTrigTable[(mask->angle + 0x4000) & 0xffff] * 0.7f);
+        mask->newpos.z = obj->pos.z + NuTrigTable[(u16)(mask->angle + 0x4000)] * 0.7f;
     }
-    if ((dz < 1.0f) || (Cursor.menu == 0x24)) {
-        mask->wibble_ang[0] = mask->wibble_ang[0] + 0xb4;
-        mask->wibble_ang[1] = mask->wibble_ang[1] + 0x104;
-        mask->wibble_ang[2] = mask->wibble_ang[2] + 0xe1;
-        dz = 0.1f;
+    if (dist < 1.0f || Cursor.menu == 0x24) {
+        mask->wibble_ang[0] += 0xB4;
+        mask->wibble_ang[1] += 0x104;
+        mask->wibble_ang[2] += 0xE1;
+        wibble = 0.1f;
     } else {
-        mask->wibble_ang[0] = mask->wibble_ang[0] + 0x2d0;
-        mask->wibble_ang[1] = mask->wibble_ang[1] + 0x410;
-        mask->wibble_ang[2] = mask->wibble_ang[2] + 900;
-        dz = (dz - 1.0f) * 0.4f + 0.1f;
+        mask->wibble_ang[0] += 0x2D0;
+        mask->wibble_ang[1] += 0x410;
+        mask->wibble_ang[2] += 0x384;
+        wibble = (dist - 1.0f) * 0.4f + 0.1f;
     }
-    (mask->newpos).x = NuTrigTable[mask->wibble_ang[0]] * dz + (mask->newpos).x;
-    (mask->newpos).y = NuTrigTable[mask->wibble_ang[1]] * dz * 0.5f + (mask->newpos).y;
-    (mask->newpos).z = NuTrigTable[mask->wibble_ang[2]] * dz + (mask->newpos).z;
-    if ((mask->idle_mode == 1) || (Cursor.menu == 0x24)) {
-        unaff_r29 = (u16)NuAtan2D(GameCam->pos.x - (mask->pos).x, GameCam->pos.z - (mask->pos).z);
+    mask->newpos.x += NuTrigTable[mask->wibble_ang[0]] * wibble;
+    mask->newpos.y += NuTrigTable[mask->wibble_ang[1]] * wibble * 0.5f;
+    mask->newpos.z += NuTrigTable[mask->wibble_ang[2]] * wibble;
+    if (mask->idle_mode == 1 || Cursor.menu == 0x24) {
+        target = NuAtan2D(GameCam[0].pos.x - mask->pos.x, GameCam[0].pos.z - mask->pos.z);
     } else if (mask->idle_mode == 0) {
-        unaff_r29 = obj->hdg;
+        target = obj->hdg;
     } else if (mask->idle_mode == 2) {
-        unaff_r29 = (u16)NuAtan2D((obj->pos).x - (mask->pos).x, (obj->pos).z - (mask->pos).z);
+        target = NuAtan2D(obj->pos.x - mask->pos.x, obj->pos.z - mask->pos.z);
     }
-    dz = 0.0f;
     yrot = mask->yrot;
     if (obj->idle_gametime > 0.0f) {
-        iVar8 = 0x111;
+        turn_speed = 0x111;
     } else {
-        iVar8 = 0x222;
+        turn_speed = 0x222;
     }
-    mask->yrot = TurnRot(yrot, unaff_r29, iVar8);
-    mask->shadow = NewShadowMaskPlat(&mask->pos, dz, -1);
+    mask->yrot = TurnRot(yrot, target, turn_speed);
+    mask->shadow = NewShadowMaskPlat(&mask->pos, 0.0f, -1);
     mask->surface_xrot = 0;
     mask->surface_zrot = 0;
     if (mask->shadow != 2000000.0f) {
-        iVar8 = ShadowInfo();
-        if ((TerSurface[iVar8].flags & 1) != 0) {
+        u16 surface_flags;
+
+        i = ShadowInfo();
+        surface_flags = TerSurface[i].flags;
+        if (surface_flags & 1) {
             mask->shadow = 2000000.0f;
         } else {
-            mask->reflect = (char)(TerSurface[iVar8].flags >> 2) & 1;
+            mask->reflect = (surface_flags >> 2) & 1;
             v = ShadNorm;
             FindAnglesZX(&v);
             mask->surface_xrot = temp_xrot;
@@ -2410,96 +2413,88 @@ void UpdateMask(struct mask_s* mask, struct obj_s* obj) {
     } else {
         mask->reflect = 0;
     }
-    f = CrateTopBelow(&mask->pos);
-    if ((f != 2000000.0f) && ((mask->shadow == 2000000.0f || (f > mask->shadow)))) {
-        mask->shadow = f;
+    below = CrateTopBelow(&mask->pos);
+    if (below != 2000000.0f && (mask->shadow == 2000000.0f || below > mask->shadow)) {
+        mask->shadow = below;
         mask->reflect = 0;
         mask->surface_xrot = 0;
         mask->surface_zrot = 0;
     }
-    f = CreatureTopBelow(&mask->pos, 4);
-    if ((f != 2000000.0f) && ((mask->shadow == 2000000.0f || (f > mask->shadow)))) {
-        mask->shadow = f;
+    below = CreatureTopBelow(&mask->pos, 4);
+    if (below != 2000000.0f && (mask->shadow == 2000000.0f || below > mask->shadow)) {
+        mask->shadow = below;
         mask->reflect = 0;
         mask->surface_xrot = 0;
         mask->surface_zrot = 0;
     }
     if (GameTimer.frame != 0) {
-        local_40 = (mask->pos);
-        dx = ((mask->newpos).x - (mask->pos).x) * 0.05f + (mask->pos).x;
-        (mask->pos).x = dx;
-        (mask->pos).y += ((mask->newpos).y - (mask->pos).y) * 0.05f;
-        local_40.z += ((mask->newpos).z - local_40.z) * 0.05f;
-        local_40.z -= (mask->pos).z;
-        (mask->pos).z = local_40.z;
-        dx -= local_40.x;
-        mul = dx * dx + dx * dx;
-        f = NuFsqrt(mul);
-        if (f > 0.05f) {
-            xrot = 0xf555;
+        oldpos = mask->pos;
+        mask->pos.x += (mask->newpos.x - mask->pos.x) * 0.05f;
+        mask->pos.y += (mask->newpos.y - mask->pos.y) * 0.05f;
+        mask->pos.z += (mask->newpos.z - mask->pos.z) * 0.05f;
+        dx = mask->pos.x - oldpos.x;
+        dz = mask->pos.z - oldpos.z;
+        dist = NuFsqrt(dx * dx + dz * dz);
+        if (dist > 0.050000004f) {
+            xrot = 0xF555;
         } else {
-            xrot = (f * 20.0f * -2731.0f);
+            xrot = (s32)(dist * 19.999998f * -2731.0f);
         }
     } else {
-        xrot = 0;
         mask->pos = mask->newpos;
+        xrot = 0;
     }
     mask->xrot = SeekRot(mask->xrot, xrot, 2);
-    (mask->anim).oldaction = (mask->anim).action;
-    (mask->anim).newaction = 0x22;
+    mask->anim.oldaction = mask->anim.action;
+    mask->anim.newaction = 0x22;
     UpdateAnimPacket(&CModel[CRemap[3]], &mask->anim, 0.5f, 0.0f);
-    mtx = NULL;
-    bVar7 = 0;
+    mtx = 0;
+    locked = 0;
     if (obj->parent == player) {
-        if ((player->obj).character == 0) {
-            if ((((mask->active > 2) && (player->spin != 0)) && (player->spin_frame > 0))
-                && (player->spin_frame < player->spin_frames - player->OnFootMoveInfo->SPINRESETFRAMES))
-            {
-                iVar8 = 0;
+        if (player->obj.character == 0) {
+            if (mask->active > 2 && player->spin != 0 && player->spin_frame > 0 &&
+                player->spin_frame <
+                    player->spin_frames - player->OnFootMoveInfo->SPINRESETFRAMES) {
+                i = 0;
             } else {
-            if ((LBIT & 0x0000000400000040) == 0) {
-                iVar8 = 3;
-            } else {
-                iVar8 = 0;
+                i = (LBIT & 0x400000040) ? 0 : 3;
+                if (mask->active > 2 && player->spin != 0 &&
+                    (player->spin_frame == 0 ||
+                     player->spin_frame <
+                         player->spin_frames -
+                             (player->OnFootMoveInfo->SPINRESETFRAMES - 1))) {
+                    locked = 1;
+                }
             }
-            if (((mask->active > 2) && (player->spin != 0))
-                && (player->spin_frame == 0
-                    || (player->spin_frame < player->spin_frames - (player->OnFootMoveInfo->SPINRESETFRAMES - 1))))
-            {
-                bVar7 = 1;
-            }
-          }
         } else {
-            iVar8 = 2;
+            i = 2;
         }
-        if (iVar8 != -1) {
-            mtx = &player->mtxLOCATOR[0][iVar8];
+        if (i != -1) {
+            mtx = &player->mtxLOCATOR[0][i];
         }
     }
-    if (bVar7) {
-        (mask->pos).x = (mask->mM)._30;
-        (mask->pos).y = (mask->mM)._31;
-        (mask->pos).z = (mask->mM)._32;
+    if (locked) {
+        mask->pos.x = mask->mM._30;
+        mask->pos.y = mask->mM._31;
+        mask->pos.z = mask->mM._32;
     } else {
         MakeMaskMatrix(mask, &mask->mM, &mask->mS, mtx, 1.0f);
     }
     if (mask->active > 2) {
-        v.x = (player->obj).pos.x;
-        v.y = ((player->obj).bot + (player->obj).top) * (player->obj).SCALE * 0.5f + (player->obj).pos.y;
-        v.z = (player->obj).pos.z;
+        v.x = player->obj.pos.x;
+        v.y = player->obj.pos.y +
+              (player->obj.bot + player->obj.top) * player->obj.SCALE * 0.5f;
+        v.z = player->obj.pos.z;
         AddVariableShotDebrisEffect(GDeb[155].i, &v, 1, 0, 0);
-    } else {
-        if (1 < mask->active) {
-            v.x = (mask->pos).x;
-            v.y = (mask->pos).y;
-            v.z = (mask->pos).z;
-            AddVariableShotDebrisEffect(GDeb[156].i, &v, 1, 0, 0);
-        }
+    } else if (mask->active > 1) {
+        v.x = mask->pos.x;
+        v.y = mask->pos.y;
+        v.z = mask->pos.z;
+        AddVariableShotDebrisEffect(GDeb[156].i, &v, 1, 0, 0);
     }
-    if ((USELIGHTS != 0) && (LIGHTMASK != 0)) {
+    if (USELIGHTS != 0 && LIGHTMASK != 0) {
         GetLights(&mask->pos, &mask->lights, 1);
     }
-    return;
 }
 
 //NGC MATCH
@@ -3088,7 +3083,7 @@ void DrawAwards(void) {
             } else if (i_chr != -1) {
                 f = (scale * 0.76999998f);
                 if (CRemap[i_chr] != -1) {
-                    Draw3DCharacter(&pos, 0, award->yrot, 0, &CModel[CRemap[i_chr]], -1, f, 1.0f, 0);
+                    Draw3DCharacter(&pos, 0, award->yrot, 0, f, &CModel[CRemap[i_chr]], -1, 1.0f, 0);
                 }
             }
             else if (award->got == 0x10) {
@@ -4813,27 +4808,26 @@ s32 FinishHGobjAnim(struct nuhspecial_s *obj) {
   return 0;
 }
 
+//NGC MATCH
 void InitVehicleToggles(void) {
   struct nugspline_s *NuSplineFind(struct nugscn_s *scene, char *name);
   float NewShadowMask(struct nuvec_s *ppos,float size,int extramask);
-  s32 i;
-  s32 action;
   struct vtog_s *tog;
-  struct nugspline_s *spl;
-  struct nuvec_s *pos;
   float y;
+  s32 vehicle;
+  s32 i;
 
-  action = LDATA->vehicle;
-  if (((action == 0x44) || (action == 0xb2)) || ((action == 0x3b) || (action == 0x20))) {
-    action = 0x62;
-  } else if (action != -1) {
-    action = 0x68;
+  vehicle = LDATA->vehicle;
+  if (vehicle == 0x44 || vehicle == 0xb2 || vehicle == 0x3b || vehicle == 0x20) {
+    vtog_action = 0x62;
+  } else if (vehicle == -1) {
+    vtog_action = -1;
+  } else {
+    vtog_action = 0x68;
   }
-  vtog_action = action;
 
-  for (i = 0; i <= 5; i++) {
-    tog = &VTog[i];
-    pos = &tog->pos;
+  tog = VTog;
+  for (i = 0; i < 6; i++, tog++) {
     tog->pTRIGGER = NULL;
     if (world_scene[0] != NULL) {
       sprintf(tbuf,"vehicle_trigger_%.2i_in",i);
@@ -4848,15 +4842,12 @@ void InitVehicleToggles(void) {
         }
         tog->type = 1;
       }
-      spl = tog->pTRIGGER;
-      if (spl->len != 3) {
+      if (tog->pTRIGGER->len != 3) {
         tog->pTRIGGER = NULL;
         continue;
       }
-      pos = (struct nuvec_s *)(spl->pts + spl->ptsize * 2);
-      tog->pos = *pos;
-      pos = &tog->pos;
-      GetALONG(pos,NULL,-1,-1,2);
+      tog->pos = *(struct nuvec_s *)(tog->pTRIGGER->pts + tog->pTRIGGER->ptsize * 2);
+      GetALONG(&tog->pos,NULL,-1,-1,2);
       tog->iRAIL = TempRPos.iRAIL;
       tog->iALONG = TempRPos.iALONG;
       tog->fALONG = TempRPos.fALONG;
@@ -4864,9 +4855,9 @@ void InitVehicleToggles(void) {
       tog->zrot = 0;
       tog->xrot = 0;
       if ((tog->type != 0) || ((LBIT & 0x10080010) == 0)) {
-        y = NewShadowMask(pos,0.0f,-1);
+        y = NewShadowMask(&tog->pos,0.0f,-1);
         if (y != 2000000.0f) {
-          pos->y = y;
+          tog->pos.y = y;
           FindAnglesZX(&ShadNorm);
           tog->xrot = temp_xrot;
           tog->zrot = temp_zrot;
@@ -4881,6 +4872,7 @@ void InitVehicleToggles(void) {
   return;
 }
 
+//NGC MATCH
 void ResetVehicleControl(s32 iRAIL,s32 iALONG,f32 fALONG) {
   s32 special_done;
   s32 found;
@@ -4907,24 +4899,26 @@ void ResetVehicleControl(s32 iRAIL,s32 iALONG,f32 fALONG) {
           }
           special_done = 1;
         }
-      } else if (found == 0) {
-        if (tog->type == 1) {
-          VEHICLECONTROL = 1;
-        } else if ((((u32 *)&LBIT)[0] & 4) | (((u32 *)&LBIT)[1] & 0x40)) {
-          VEHICLECONTROL = 2;
-        } else {
-          VEHICLECONTROL = 0;
+      } else {
+        if (found == 0) {
+          if (tog->type == 1) {
+            VEHICLECONTROL = 1;
+          } else if (LBIT & 0x400000040ULL) {
+            VEHICLECONTROL = 2;
+          } else {
+            VEHICLECONTROL = 0;
+          }
         }
         found = 1;
       }
     }
     if (special_done != 0) {
       if (found != 0) {
-        break;
+        goto end;
       }
     }
   }
-  if ((special_done == 0) || (found == 0)) {
+  {
     tog = &VTog[5];
     for (i = 5; i >= 0; i--, tog--) {
       if ((tog->pTRIGGER != NULL) &&
@@ -4938,307 +4932,236 @@ void ResetVehicleControl(s32 iRAIL,s32 iALONG,f32 fALONG) {
             }
             special_done = 1;
           }
-        } else if (found == 0) {
-          if (tog->type == 1) {
-            if ((((u32 *)&LBIT)[0] & 4) | (((u32 *)&LBIT)[1] & 0x40)) {
-              VEHICLECONTROL = 2;
+        } else {
+          if (found == 0) {
+            if (tog->type == 1) {
+              if (LBIT & 0x400000040ULL) {
+                VEHICLECONTROL = 2;
+              } else {
+                VEHICLECONTROL = 0;
+              }
             } else {
-              VEHICLECONTROL = 0;
+              VEHICLECONTROL = 1;
             }
-          } else {
-            VEHICLECONTROL = 1;
           }
           found = 1;
         }
       }
       if (special_done != 0) {
         if (found != 0) {
-          break;
+          goto end;
         }
       }
     }
   }
-  {
-    f32 zero;
-
-    zero = 0.0f;
-    vtog_duration = zero;
-    vtog_time = vtog_duration;
-  }
+end:
+  vtog_time = 0.0f;
+  vtog_duration = 0.0f;
   return;
 }
 
+//NGC MATCH
 void ToggleVehicle(struct creature_s *c) {
-  struct nuvec_s v1, v2;
-  struct nuvec_s oldp, curp;
-  struct nuvec_s debrispos;
-  s32 mirrored;
-  s32 i;
-  s32 vcont;
-  struct vtog_s *tog;
-  struct nuvec_s *ppos;
-  f32 y;
-
-  if (c->obj.dead != 0) {
-    return;
-  }
-
-  mirrored = 0;
-  if (Level == 6 || Level == 0x22) {
-    mirrored = 1;
-  }
-
-  if (mirrored != 0) {
-    oldp.x = -(c->obj).oldpos.y;
-    oldp.y = (c->obj).oldpos.x;
-    oldp.z = (c->obj).oldpos.z;
-    curp.x = -(c->obj).pos.y;
-    curp.y = (c->obj).pos.x;
-    curp.z = (c->obj).pos.z;
-  } else {
-    oldp = (c->obj).oldpos;
-    curp = (c->obj).pos;
-  }
-
-  if (Level == 0x16) {
-    vcont = VEHICLECONTROL;
-    if (vcont == 0) {
-      if (oldp.z >= AshesMechInZ && curp.z < AshesMechInZ) {
-        vtog_oldpos = (c->obj).pos;
-        VEHICLECONTROL = 1;
-        ResetPlayerMoves(c);
-        vtog_newpos = AshesMechInPos;
-        vtog_duration = 1.0f;
-        vtog_time = 0.0f;
-        y = NewShadow(&vtog_newpos, 0.0f);
-        if (y != 2000000.0f) {
-          vtog_newpos.y = y - (c->obj).bot * (c->obj).SCALE;
-        }
-        vtog_blend = 1;
-        pVTog = (struct pVTog *)vcont;
-        vtog_angle = (u16)vcont;
-        AddGameDebris(0x10, &(c->obj).pos);
-        AddGameDebris(0x11, &(c->obj).pos);
-        GameSfx(0x2f, &(c->obj).pos);
-        return;
-      }
-    }
-    if (vcont == 1) {
-      if (oldp.z < AshesMechOutZ && curp.z >= AshesMechOutZ) {
-        vtog_oldpos = (c->obj).pos;
-        VEHICLECONTROL = 0;
-        ResetPlayerMoves(c);
-        vtog_newpos = AshesMechOutPos;
-        vtog_duration = 1.0f;
-        vtog_time = 0.0f;
-        y = NewShadow(&vtog_newpos, 0.0f);
-        if (y != 2000000.0f) {
-          vtog_newpos.y = y - (c->obj).bot * (c->obj).SCALE;
-        }
-        vtog_blend = vcont;
-        pVTog = (struct pVTog *)0;
-        vtog_angle = 0;
-        AddGameDebris(0x10, &(c->obj).pos);
-        AddGameDebris(0x11, &(c->obj).pos);
-        GameSfx(0x2f, &(c->obj).pos);
-
-        debrispos.x = (c->obj).pos.x;
-        debrispos.y = ((c->obj).bot + (c->obj).top) * (c->obj).SCALE * 0.5f + (c->obj).pos.y;
-        debrispos.z = (c->obj).pos.z;
-        AddMechanicalDebris(&debrispos, 0xb2);
-        GameSfx(0x3b, &(c->obj).pos);
-        JudderGameCamera(GameCam, 0.3f, NULL);
-        return;
-      }
-    }
-  }
-
-  tog = VTog;
-  for (i = 0; i <= 5; i++, tog++) {
+    struct nuvec_s p0;
+    struct nuvec_s p1;
+    struct nuvec_s oldpos;
+    struct nuvec_s newpos;
+    struct nuvec_s pos;
+    struct vtog_s *vt;
     struct nugspline_s *spl;
-    s32 type_val;
-    char *pts;
-    s16 ptsize;
-    char *pts2;
-    struct nuvec_s *pv1;
-    struct nuvec_s *pv2;
-    f32 cross_old, cross_cur;
-    f32 dx, dz;
-    s32 old_ge, cur_ge;
+    struct nuvec_s *pt0;
+    struct nuvec_s *pt1;
+    float y;
+    s32 mirror;
+    s32 oldside;
+    s32 newside;
+    s32 i;
 
-    spl = tog->pTRIGGER;
-    if (spl == NULL) {
-      continue;
+    if (c->obj.dead != 0) {
+        return;
     }
-
-    if (Level == 0xf) {
-      if (i > 1) {
-        goto do_trigger;
-      }
+    mirror = 0;
+    if (Level == 6 || Level == 0x22) {
+        mirror = 1;
     }
-
-    type_val = (s8)tog->type;
-    if (type_val == 0) {
-      if (VEHICLECONTROL == 1) {
-        continue;
-      }
-    } else if (type_val == 1) {
-      if (VEHICLECONTROL != 1) {
-        continue;
-      }
-    }
-
-  do_trigger:
-    pts = spl->pts;
-    ptsize = spl->ptsize;
-    pts2 = pts + ptsize;
-    pv1 = (struct nuvec_s *)pts;
-    pv2 = (struct nuvec_s *)pts2;
-
-    if (mirrored != 0) {
-      v1.x = -pv1->y;
-      v1.y = pv1->x;
-      v1.z = pv1->z;
-      v2.x = -pv2->y;
-      v2.y = pv2->x;
-      v2.z = pv2->z;
+    if (mirror) {
+        oldpos.x = -c->obj.oldpos.y;
+        oldpos.y = c->obj.oldpos.x;
+        oldpos.z = c->obj.oldpos.z;
+        newpos.x = -c->obj.pos.y;
+        newpos.y = c->obj.pos.x;
+        newpos.z = c->obj.pos.z;
     } else {
-      v1 = *pv1;
-      v2 = *pv2;
+        oldpos = c->obj.oldpos;
+        newpos = c->obj.pos;
     }
-
-    dx = v1.x - v2.x;
-    dz = v2.z - v1.z;
-    cross_cur = (curp.x - v1.x) * dz + (curp.z - v1.z) * dx;
-    cross_old = (oldp.x - v1.x) * dz + (oldp.z - v1.z) * dx;
-
-    old_ge = (cross_old >= 0.0f) ? 1 : 0;
-    cur_ge = (cross_cur >= 0.0f) ? 1 : 0;
-
-    if (old_ge != 0) {
-      if (cur_ge != 0) {
-        continue;
-      }
-      if ((curp.x - oldp.x) * (v1.z - oldp.z) + (curp.z - oldp.z) * (oldp.x - v1.x) >= 0.0f &&
-          (curp.x - v2.x) * (oldp.z - v2.z) + (curp.z - v2.z) * (v2.x - oldp.x) >= 0.0f) {
-        if (Level == 0xf && i > 1) {
-          if (tog->type == 0) {
-            SKELETALCRASH = 1;
-            GameSfx(0x1e, NULL);
-          } else {
-            SKELETALCRASH = 0;
-            GameSfx(0x21, NULL);
-          }
-          return;
+    if (Level == 0x16) {
+        if (VEHICLECONTROL == 0 && oldpos.z >= AshesMechInZ && newpos.z < AshesMechInZ) {
+            VEHICLECONTROL = 1;
+            vtog_oldpos = c->obj.pos;
+            ResetPlayerMoves(c);
+            vtog_time = 0.0f;
+            vtog_duration = 1.0f;
+            vtog_newpos = AshesMechInPos;
+            y = NewShadow(&vtog_newpos, vtog_time);
+            if (y != 2000000.0f) {
+                vtog_newpos.y = y - c->obj.bot * c->obj.SCALE;
+            }
+            vtog_blend = 1;
+            vtog_angle = 0;
+            pVTog = NULL;
+            AddGameDebris(0x10, &c->obj.pos);
+            AddGameDebris(0x11, &c->obj.pos);
+            GameSfx(0x2F, &c->obj.pos);
+            return;
         }
-        goto do_toggle;
-      }
-      continue;
-    }
-    if (cur_ge == 0) {
-      continue;
-    }
-    if ((curp.x - oldp.x) * (v2.z - oldp.z) + (curp.z - oldp.z) * (oldp.x - v2.x) >= 0.0f &&
-        (curp.x - v1.x) * (oldp.z - v1.z) + (curp.z - v1.z) * (v1.x - oldp.x) >= 0.0f) {
-      if (Level == 0xf) {
-        if (i > 1) {
-          if ((s8)tog->type == 0) {
-            SKELETALCRASH = 0;
-            GameSfx(0x21, NULL);
-          } else {
-            SKELETALCRASH = 1;
-            GameSfx(0x1e, NULL);
-          }
+        if (VEHICLECONTROL == 1 && oldpos.z < AshesMechOutZ && newpos.z >= AshesMechOutZ) {
+            VEHICLECONTROL = 0;
+            vtog_oldpos = c->obj.pos;
+            ResetPlayerMoves(c);
+            vtog_time = 0.0f;
+            vtog_duration = 1.0f;
+            vtog_newpos = AshesMechOutPos;
+            y = NewShadow(&vtog_newpos, vtog_time);
+            if (y != 2000000.0f) {
+                vtog_newpos.y = y - c->obj.bot * c->obj.SCALE;
+            }
+            vtog_blend = 1;
+            vtog_angle = 0;
+            pVTog = NULL;
+            AddGameDebris(0x10, &c->obj.pos);
+            AddGameDebris(0x11, &c->obj.pos);
+            GameSfx(0x2F, &c->obj.pos);
+            pos.x = c->obj.pos.x;
+            pos.y = c->obj.pos.y + (c->obj.bot + c->obj.top) * c->obj.SCALE * 0.5f;
+            pos.z = c->obj.pos.z;
+            AddMechanicalDebris(&pos, 0xB2);
+            GameSfx(0x3B, &c->obj.pos);
+            JudderGameCamera(&GameCam[0], 0.3f, NULL);
+            return;
         }
-      }
-      return;
     }
-    continue;
-
-  do_toggle:
-    ppos = &(c->obj).pos;
-    vtog_oldpos = *ppos;
-
-    if (tog->type == 0) {
-      VEHICLECONTROL = 1;
-    } else {
-      if ((((u32 *)&LBIT)[0] & 4) | (((u32 *)&LBIT)[1] & 0x40)) {
-        VEHICLECONTROL = 2;
-      } else {
-        VEHICLECONTROL = 0;
-      }
+    for (i = 0, vt = VTog; i < 6; i++, vt++) {
+        if (vt->pTRIGGER == NULL) {
+            continue;
+        }
+        if (Level != 0xF || i < 2) {
+            if (vt->type == 0 && VEHICLECONTROL == 1) {
+                continue;
+            }
+            if (vt->type == 1 && VEHICLECONTROL != 1) {
+                continue;
+            }
+        }
+        spl = vt->pTRIGGER;
+        pt0 = (struct nuvec_s *)spl->pts;
+        pt1 = (struct nuvec_s *)(spl->pts + spl->ptsize);
+        if (mirror) {
+            p0.x = -pt0->y;
+            p0.y = pt0->x;
+            p0.z = pt0->z;
+            p1.x = -pt1->y;
+            p1.y = pt1->x;
+            p1.z = pt1->z;
+        } else {
+            p0 = *pt0;
+            p1 = *pt1;
+        }
+        oldside = (oldpos.x - p0.x) * (p1.z - p0.z) + (oldpos.z - p0.z) * (p0.x - p1.x) >= 0.0f;
+        newside = (newpos.x - p0.x) * (p1.z - p0.z) + (newpos.z - p0.z) * (p0.x - p1.x) >= 0.0f;
+        if (oldside && !newside &&
+            (newpos.x - oldpos.x) * (p0.z - oldpos.z) + (newpos.z - oldpos.z) * (oldpos.x - p0.x) >= 0.0f &&
+            (newpos.x - p1.x) * (oldpos.z - p1.z) + (newpos.z - p1.z) * (p1.x - oldpos.x) >= 0.0f) {
+            if (Level == 0xF && i >= 2) {
+                if (vt->type == 0) {
+                    SKELETALCRASH = 1;
+                    GameSfx(0x1E, NULL);
+                } else {
+                    SKELETALCRASH = 0;
+                    GameSfx(0x21, NULL);
+                }
+                return;
+            }
+            vtog_oldpos = c->obj.pos;
+            if (vt->type == 0) {
+                VEHICLECONTROL = 1;
+            } else if ((LBIT & 0x400000040ULL) != 0) {
+                VEHICLECONTROL = 2;
+            } else {
+                VEHICLECONTROL = 0;
+            }
+            ResetPlayerMoves(c);
+            vtog_time = 0.0f;
+            vtog_duration = 1.0f;
+            vtog_newpos.x = vt->pos.x;
+            vtog_newpos.y = vt->pos.y - c->obj.bot * c->obj.SCALE;
+            vtog_newpos.z = vt->pos.z;
+            if (mirror && pos_START != NULL) {
+                vtog_newpos.x = pos_START->x;
+            }
+            vtog_blend = 1;
+            vt->m = c->m;
+            if (vt->type == 0) {
+                ResetAnimPacket(&vt->anim, vtog_action);
+            } else {
+                vt->anim = c->obj.anim;
+            }
+            if (c->obj.vehicle == 0xA1) {
+                BlendGameCamera(&GameCam[0], 1.0f);
+            } else if (vt->pCAM != NULL && vtog_blend != 0) {
+                GameCam[0].mode = -1;
+            }
+            if (vt->type == 0) {
+                AddGameDebris(0x10, &c->obj.pos);
+                AddGameDebris(0x11, &c->obj.pos);
+                GameSfx(0x2F, &c->obj.pos);
+                if (Level == 4) {
+                    c->obj.direction = 0;
+                }
+            } else {
+                AddGameDebris(0x10, &c->obj.pos);
+                AddGameDebris(0x11, &c->obj.pos);
+                GameSfx(0x2F, &c->obj.pos);
+                pos.x = c->obj.pos.x;
+                pos.y = c->obj.pos.y + (c->obj.bot + c->obj.top) * c->obj.SCALE * 0.5f;
+                pos.z = c->obj.pos.z;
+                switch (c->obj.vehicle) {
+                case 0x3B:
+                case 0x44:
+                case 0x63:
+                case 0x99:
+                case 0xB2:
+                    GameSfx(0x69, &pos);
+                    AddMechanicalDebris(&pos, c->obj.vehicle);
+                    break;
+                case 0x20:
+                    AddMechanicalDebris(&pos, 0x20);
+                    break;
+                }
+                GameSfx(0x3B, &c->obj.pos);
+                JudderGameCamera(&GameCam[0], 0.3f, NULL);
+            }
+            pVTog = vt;
+            vtog_angle = vt->yrot;
+            return;
+        }
+        if (!oldside && newside &&
+            (newpos.x - oldpos.x) * (p1.z - oldpos.z) + (newpos.z - oldpos.z) * (oldpos.x - p1.x) >= 0.0f &&
+            (newpos.x - p0.x) * (oldpos.z - p0.z) + (newpos.z - p0.z) * (p0.x - oldpos.x) >= 0.0f) {
+            if (Level == 0xF && i >= 2) {
+                if (vt->type == 0) {
+                    SKELETALCRASH = 0;
+                    GameSfx(0x21, NULL);
+                } else {
+                    SKELETALCRASH = 1;
+                    GameSfx(0x1E, NULL);
+                }
+            }
+            return;
+        }
     }
-
-    ResetPlayerMoves(c);
-
-    vtog_newpos.x = tog->pos.x;
-    vtog_newpos.y = tog->pos.y - (c->obj).bot * (c->obj).SCALE;
-    vtog_newpos.z = tog->pos.z;
-    vtog_time = 0.0f;
-    vtog_duration = 1.0f;
-
-    if (mirrored != 0 && pos_START != NULL) {
-      vtog_newpos.x = pos_START->x;
-    }
-
-    vtog_blend = 1;
-
-    tog->m = c->m;
-
-    if (tog->type == 0) {
-      ResetAnimPacket(&tog->anim, vtog_action);
-    } else {
-      tog->anim = (c->obj).anim;
-    }
-
-    if ((c->obj).vehicle == 0xa1) {
-      BlendGameCamera(GameCam, 1.0f);
-    } else {
-      if (tog->pCAM != NULL && vtog_blend != 0) {
-        GameCam[0].mode = -1;
-      }
-    }
-
-    type_val = (s8)tog->type;
-    if (type_val == 0) {
-      AddGameDebris(0x10, ppos);
-      AddGameDebris(0x11, ppos);
-      GameSfx(0x2f, ppos);
-      if (Level == 4) {
-        (c->obj).direction = 0;
-      }
-    } else {
-      AddGameDebris(0x10, ppos);
-      AddGameDebris(0x11, ppos);
-      GameSfx(0x2f, ppos);
-
-      debrispos.x = (c->obj).pos.x;
-      debrispos.y = ((c->obj).bot + (c->obj).top) * (c->obj).SCALE * 0.5f + (c->obj).pos.y;
-      debrispos.z = (c->obj).pos.z;
-
-      switch ((c->obj).vehicle) {
-        case 0x3b:
-        case 0x44:
-        case 0x63:
-        case 0x99:
-        case 0xb2:
-          GameSfx(0x69, &debrispos);
-          AddMechanicalDebris(&debrispos, (s32)(c->obj).vehicle);
-          break;
-        case 0x20:
-          AddMechanicalDebris(&debrispos, 0x20);
-          break;
-      }
-
-      GameSfx(0x3b, ppos);
-      JudderGameCamera(GameCam, 0.3f, NULL);
-    }
-
-    pVTog = tog;
-    vtog_angle = tog->yrot;
-    return;
-  }
 }
+
 void GetLocatorMtx(struct CharacterModel *Model,struct numtx_s *LocMtx,f32 YAngOff3)
 {
   /*
@@ -8426,15 +8349,15 @@ s32 PlayerObjectAnimCollision(struct obj_s *obj,struct nuspecial_s *special,floa
   return 0;
 }
 
-//98% NGC
-void BonusTiming (struct creature_s* plr) {
+//NGC MATCH
+void BonusTiming(struct creature_s *plr) {
     s32 dead;
 
     dead = 0;
-    if ((Bonus == 2) && ((plr->obj).dead != 0)) {
+    if (Bonus == 2 && plr->obj.dead != 0) {
         dead = 1;
     }
-    if (((Bonus != 3) && (Bonus != 4)) && (!dead)) {
+    if ((Bonus != 3 && Bonus != 4) && !dead) {
         return;
     }
     bonus_finish_frame++;
@@ -8458,7 +8381,7 @@ void BonusTiming (struct creature_s* plr) {
                 bonus_wumpa_wait = 0.5f;
             }
         } else if (bonus_wumpa_wait > 0.0f) {
-            bonus_wumpa_wait -= 0.01666667f;
+            bonus_wumpa_wait -= 0.016666668f;
             if (bonus_wumpa_wait < 0.0f) {
                 bonus_wumpa_wait = 0.0f;
             }
@@ -8479,13 +8402,12 @@ void BonusTiming (struct creature_s* plr) {
         if (bonus_lives == 0) {
             bonus_lives_wait = 0.5f;
         }
-    } else if (bonus_lives == 0 && bonus_lives_wait > 0.0f) {
-        bonus_lives_wait -= 0.01666667f;
+    } else if (bonus_lives_wait > 0.0f) {
+        bonus_lives_wait -= 0.016666668f;
         if (bonus_lives_wait < 0.0f) {
             bonus_lives_wait = 0.0f;
         }
     }
-    return;
 }
 
 //NGC MATCH

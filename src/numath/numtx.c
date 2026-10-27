@@ -5,6 +5,8 @@
 #include "nuvec.h"
 #include "nufloat.h"
 
+double sqrt(double x);
+
 struct Mtx mident = {
 	1.0, 0.0, 0.0, 0.0,
 	0.0, 1.0, 0.0, 0.0,
@@ -536,83 +538,50 @@ void NuMtxInvRSS(struct Mtx* dest, struct Mtx* m)
 	dest->m42 = 0.0;
 }
 
-// TODO: Clean this function up
-void NuMtxAlignZ(struct Mtx* dest, struct nuvec_s* v)
+//NGC MATCH
+void NuMtxAlignZ(struct Mtx* m, struct nuvec_s* v)
 {
-	float tmp1;
-	float tmp2;
-	struct nuvec_s* tmp3;
-	struct nuvec_s* tmp4;
-	float tmp5;
-	float tmp6;
-	float tmp7;
+    const float xLenSq = m->m11 * m->m11 + m->m12 * m->m12 + m->m13 * m->m13;
+    const float yLenSq = m->m21 * m->m21 + m->m22 * m->m22 + m->m23 * m->m23;
+    const float zLenSq = m->m31 * m->m31 + m->m32 * m->m32 + m->m33 * m->m33;
+    float len;
+    float l;
 
-    tmp2 = v->z * v->z + v->x * v->x + v->y * v->y;
-    tmp1 = 0.0;
-    tmp6 = dest->m13 * dest->m13 + dest->m11 * dest->m11 + dest->m12 * dest->m12;
-    tmp7 = dest->m23 * dest->m23 + dest->m21 * dest->m21 + dest->m22 * dest->m22;
-	if (tmp2 != 0.0)
-	{
-        tmp5 = NuFsqrt((dest->m33 * dest->m33 + dest->m31 * dest->m31 + dest->m32 * dest->m32) / tmp2);
-        tmp1 = tmp5;
-	}
-    tmp3 = (struct nuvec_s*)&dest->m21;
-    tmp4 = (struct nuvec_s*)&dest->m31;
-	dest->m31 = tmp1 * v->x;
-	dest->m32 = tmp1 * v->y;
-	dest->m33 = tmp1 * v->z;
-	tmp5 = NuVecDot(tmp3, tmp4);
-    tmp5 = NuFabs(tmp5);
-	if (tmp5 <= 0.8660253882408142)
-	{
-		NuVecCross((struct nuvec_s*)dest, tmp3, tmp4);
-        tmp1 = 0.0;
-        tmp5 = dest->m13 * dest->m13 + dest->m11 * dest->m11 + dest->m12 * dest->m12;
-		if (tmp5 != 0.0)
-		{
-            tmp6 = NuFsqrt(tmp6 / tmp5);
-            tmp1 = tmp6;
-		}
-		dest->m11 = dest->m11 * tmp1;
-		dest->m12 = dest->m12 * tmp1;
-		dest->m13 = dest->m13 * tmp1;
-		NuVecCross(tmp3, tmp4, (struct nuvec_s*)dest);
-        tmp1 = 0.0;
-        tmp6 = dest->m23 * dest->m23 + dest->m21 * dest->m21 + dest->m22 * dest->m22;
-		if (tmp6 != 0.0)
-		{
-            tmp6 = NuFsqrt(tmp7 / tmp6);
-            tmp1 = tmp6;
-		}
-		dest->m21 = dest->m21 * tmp1;
-		dest->m22 = dest->m22 * tmp1;
-		dest->m23 = dest->m23 * tmp1;
-	}
-	else
-	{
-		NuVecCross(tmp3, tmp4, (struct nuvec_s*)dest);
-        tmp1 = 0.0;
-        tmp5 = dest->m23 * dest->m23 + dest->m21 * dest->m21 + dest->m22 * dest->m22;
-		if (tmp5 != 0.0)
-		{
-            tmp7 = NuFsqrt(tmp7 / tmp5);
-            tmp1 = tmp7;
-		}
-		dest->m21 = dest->m21 * tmp1;
-		dest->m22 = dest->m22 * tmp1;
-		dest->m23 = dest->m23 * tmp1;
-		NuVecCross((struct nuvec_s*)dest, tmp3, tmp4);
-        tmp1 = 0.0;
-        tmp7 = dest->m13 * dest->m13 + dest->m11 * dest->m11 + dest->m12 * dest->m12;
-		if (tmp7 != 0.0)
-		{
-            tmp6 = NuFsqrt(tmp6 / tmp7);
-            tmp1 = tmp6;
-		}
-		dest->m11 = dest->m11 * tmp1;
-		dest->m12 = dest->m12 * tmp1;
-		dest->m13 = dest->m13 * tmp1;
-	}
+    len = v->x * v->x + v->y * v->y + v->z * v->z;
+    l = (len != 0.0f) ? (float)sqrt(zLenSq / len) : 0.0f;
+    m->m31 = l * v->x;
+    m->m32 = l * v->y;
+    m->m33 = l * v->z;
+    l = NuVecDot((struct nuvec_s*)&m->m21,(struct nuvec_s*)&m->m31);
+    l = NuFabs(l);
+    if (0.8660254f < l) {
+        NuVecCross((struct nuvec_s*)&m->m21,(struct nuvec_s*)&m->m31,(struct nuvec_s*)m);
+        len = m->m21 * m->m21 + m->m22 * m->m22 + m->m23 * m->m23;
+        l = (len != 0.0f) ? (float)sqrt(yLenSq / len) : 0.0f;
+        m->m21 = m->m21 * l;
+        m->m22 = m->m22 * l;
+        m->m23 = m->m23 * l;
+        NuVecCross((struct nuvec_s*)m,(struct nuvec_s*)&m->m21,(struct nuvec_s*)&m->m31);
+        len = m->m11 * m->m11 + m->m12 * m->m12 + m->m13 * m->m13;
+        l = (len != 0.0f) ? (float)sqrt(xLenSq / len) : 0.0f;
+        m->m11 = m->m11 * l;
+        m->m12 = m->m12 * l;
+        m->m13 = m->m13 * l;
+    }
+    else {
+        NuVecCross((struct nuvec_s*)m,(struct nuvec_s*)&m->m21,(struct nuvec_s*)&m->m31);
+        len = m->m11 * m->m11 + m->m12 * m->m12 + m->m13 * m->m13;
+        l = (len != 0.0f) ? (float)sqrt(xLenSq / len) : 0.0f;
+        m->m11 = m->m11 * l;
+        m->m12 = m->m12 * l;
+        m->m13 = m->m13 * l;
+        NuVecCross((struct nuvec_s*)&m->m21,(struct nuvec_s*)&m->m31,(struct nuvec_s*)m);
+        len = m->m21 * m->m21 + m->m22 * m->m22 + m->m23 * m->m23;
+        l = (len != 0.0f) ? (float)sqrt(yLenSq / len) : 0.0f;
+        m->m21 = m->m21 * l;
+        m->m22 = m->m22 * l;
+        m->m23 = m->m23 * l;
+    }
 }
 
 void NuMtxLookAtZ(struct Mtx* dest, struct nuvec_s* v)
