@@ -127,6 +127,7 @@ union variptr_u
     unsigned short* u16;
     short* s16;
     unsigned int* u32;
+    int* s32;
     long long* u64;
     long long* u128;
     float* f32;
@@ -137,6 +138,7 @@ union variptr_u
     struct numtx_s* mtx44;
     unsigned int* viftag;
     unsigned int intaddr;
+    char* charptr;
     struct _sceDmaTag* dmatag;
     struct giftag* gifTag;
 

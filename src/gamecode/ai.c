@@ -358,9 +358,9 @@ void DrawDRAINDAMAGE(void)		//TODO
       drain_wawa_xrot,
       (u16)((drain_wawa_yrot - 0x8000) & 0xFFFF),
       0,
+      3.0f,
       drain_wawa_model,
       (s32)drain_wawa_anim.action,
-      3.0f,
       drain_wawa_anim.anim_time,
       0
     );
@@ -721,7 +721,7 @@ void DrawCRUNCHTIME(void) {
   }
   i = CRemap[4];
   if (i != -1) {
-    Draw3DCharacter(&space_ukapos,0,0,0,&CModel[i],-1,1.0f,1.0f,0);
+    Draw3DCharacter(&space_ukapos,0,0,0,1.0f,&CModel[i],-1,1.0f,0);
   }
   DrawVehMasks();
 }

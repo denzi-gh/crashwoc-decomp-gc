@@ -85,7 +85,7 @@ s32 NuTexImgSize(enum nutextype_e type, s32 width, s32 height);
 s32 NuTexPalSize(enum nutextype_e type);
 
 // Read bitmap data into a texture.
-s32 NuTexReadBitmapMM(char* fileName, s32 mmlevel, struct nutex_s* tex); // TODO!!! FINISH!!!
+s32 NuTexReadBitmapMM(char* fileName, s32 mmlevel, struct nutex_s* tex);
 s32 NuTexGetDecalInfo(s32 tid);
 void NuTexSetTextureStates(struct numtl_s *mtl);
 void NuTexSetTexture(u32 stage,s32 tid);

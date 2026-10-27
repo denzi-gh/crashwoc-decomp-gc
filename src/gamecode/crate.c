@@ -1781,6 +1781,7 @@ void DrawCrateExplosions(void) {
   s32 fade;
   s32 col;
   s32 col2;
+  s32 converted;
   s32 a;
   s32 r;
   s32 g;
@@ -1825,104 +1826,106 @@ void DrawCrateExplosions(void) {
         uvs_fade_mat2 = uvs;
         for (lp2 = 6; lp2 != 0; lp2--) {
           fade = BoxExpList[lp].time - BoxFace->rndfade;
-          if (fade > 0) {
-            if (fade <= 6) {
-              col2 = col + (fade << 0x1c);
-              if ((u16)(BoxExpList[lp].type - 10) <= 2) {
+          if (fade < 7) {
+            if (fade > 0) {
+              if ((u16)BoxExpList[lp].type - 10U <= 2) {
+                col2 = col + (fade << 0x1c);
                 a = (col2 >> 0x17) & 0x1fe;
                 if (a > 0xff) {
                   a = 0xff;
                 }
                 r = (col2 & 0xe0) << 1;
+                converted = a << 0x18;
                 if (r > 0xff) {
                   r = 0xff;
                 }
                 g = (col2 >> 7) & 0x1fe;
+                converted += r << 0x10;
                 if (g > 0xff) {
                   g = 0xff;
                 }
+                converted += g << 8;
                 b = (col2 >> 0xf) & 0x1fe;
                 if (b > 0xff) {
                   b = 0xff;
                 }
-                col2 = a << 0x18;
-                col2 += r << 0x10;
-                col2 += g << 8;
-                col2 += b;
-                AddQuad3DrotXYZ(&BoxFace->pos,shape,CrateMat2,&BoxFace->ang,uvs_fade_mat2,col2);
+                converted += b;
+                AddQuad3DrotXYZ(&BoxFace->pos,shape,CrateMat2,&BoxFace->ang,uvs_fade_mat2,converted);
               }
               else {
+                col2 = col + (fade << 0x1c);
                 a = (col2 >> 0x17) & 0x1fe;
                 if (a > 0xff) {
                   a = 0xff;
                 }
                 r = (col2 & 0xe0) << 1;
+                converted = a << 0x18;
                 if (r > 0xff) {
                   r = 0xff;
                 }
                 g = (col2 >> 7) & 0x1fe;
+                converted += r << 0x10;
                 if (g > 0xff) {
                   g = 0xff;
                 }
+                converted += g << 8;
                 b = (col2 >> 0xf) & 0x1fe;
                 if (b > 0xff) {
                   b = 0xff;
                 }
-                col2 = a << 0x18;
-                col2 += r << 0x10;
-                col2 += g << 8;
-                col2 += b;
-                AddQuad3DrotXYZ(&BoxFace->pos,shape,CrateMat,&BoxFace->ang,uvs_fade_regular,col2);
+                converted += b;
+                AddQuad3DrotXYZ(&BoxFace->pos,shape,CrateMat,&BoxFace->ang,uvs_fade_regular,converted);
               }
+            }
+          } else {
+            u32 a, r, g, b;
+            if ((u16)BoxExpList[lp].type - 10U <= 2) {
+              col2 = col + 0x80000000;
+              a = (col2 >> 0x17) & 0x1fe;
+              if (a > 0xff) {
+                a = 0xff;
+              }
+              r = (col2 & 0xe0) << 1;
+              converted = a << 0x18;
+              if (r > 0xff) {
+                r = 0xff;
+              }
+              g = (col2 >> 7) & 0x1fe;
+              converted += r << 0x10;
+              if (g > 0xff) {
+                g = 0xff;
+              }
+              converted += g << 8;
+              b = (col2 >> 0xf) & 0x1fe;
+              if (b > 0xff) {
+                b = 0xff;
+              }
+              converted += b;
+              AddQuad3DrotXYZ(&BoxFace->pos,shape,CrateMat2,&BoxFace->ang,uvs_mat2,converted);
             }
             else {
               col2 = col + 0x80000000;
-              if ((u16)(BoxExpList[lp].type - 10) <= 2) {
-                a = (col2 >> 0x17) & 0x1fe;
-                if (a > 0xff) {
-                  a = 0xff;
-                }
-                r = (col2 & 0xe0) << 1;
-                if (r > 0xff) {
-                  r = 0xff;
-                }
-                g = (col2 >> 7) & 0x1fe;
-                if (g > 0xff) {
-                  g = 0xff;
-                }
-                b = (col2 >> 0xf) & 0x1fe;
-                if (b > 0xff) {
-                  b = 0xff;
-                }
-                col2 = a << 0x18;
-                col2 += r << 0x10;
-                col2 += g << 8;
-                col2 += b;
-                AddQuad3DrotXYZ(&BoxFace->pos,shape,CrateMat2,&BoxFace->ang,uvs_mat2,col2);
+              a = (col2 >> 0x17) & 0x1fe;
+              if (a > 0xff) {
+                a = 0xff;
               }
-              else {
-                a = (col2 >> 0x17) & 0x1fe;
-                if (a > 0xff) {
-                  a = 0xff;
-                }
-                r = (col2 & 0xe0) << 1;
-                if (r > 0xff) {
-                  r = 0xff;
-                }
-                g = (col2 >> 7) & 0x1fe;
-                if (g > 0xff) {
-                  g = 0xff;
-                }
-                b = (col2 >> 0xf) & 0x1fe;
-                if (b > 0xff) {
-                  b = 0xff;
-                }
-                col2 = a << 0x18;
-                col2 += r << 0x10;
-                col2 += g << 8;
-                col2 += b;
-                AddQuad3DrotXYZ(&BoxFace->pos,shape,CrateMat,&BoxFace->ang,uvs_regular,col2);
+              r = (col2 & 0xe0) << 1;
+              converted = a << 0x18;
+              if (r > 0xff) {
+                r = 0xff;
               }
+              g = (col2 >> 7) & 0x1fe;
+              converted += r << 0x10;
+              if (g > 0xff) {
+                g = 0xff;
+              }
+              converted += g << 8;
+              b = (col2 >> 0xf) & 0x1fe;
+              if (b > 0xff) {
+                b = 0xff;
+              }
+              converted += b;
+              AddQuad3DrotXYZ(&BoxFace->pos,shape,CrateMat,&BoxFace->ang,uvs_regular,converted);
             }
           }
           BoxFace++;

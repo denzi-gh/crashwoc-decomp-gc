@@ -415,7 +415,7 @@ void SetupShaders(struct nugeomitem_s* geomitem) {
         case WATER: // 1
             IsWaterObj = WATER;
             CV_WORLDVIEWPROJ = *(struct _GSMATRIX*) &matWorldViewProj;
-            CV_SHADER_PARAMS = *(struct _GS_VECTOR4 *)makenuvec4((mtl->fx2.f32 / mtl->fx4.f32) * 0.02083333f, mtl->fx3.f32 / mtl->fx4.f32, mtl->fx4.f32, 0.0f);
+            CV_SHADER_PARAMS = *(struct _GS_VECTOR4 *)makenuvec4((mtl->fx2.f32 / mtl->fx4.f32) * 0.020833334f, mtl->fx3.f32 / mtl->fx4.f32, mtl->fx4.f32, 0.0f);
             CV_SCREEN_PARAMS = *(struct _GS_VECTOR4 *)makenuvec4(SWIDTH,SHEIGHT, 0.0f, 0.0f);
             NuWaterSetup();
             GS_SetBlendSrc(1, 4, 5);
@@ -594,9 +594,10 @@ void SetupShaders(struct nugeomitem_s* geomitem) {
                     NuVecMtxTransform(&lightpos, &lightpos, &invWorld);
                     CV_LIGHT_POSITION = *(struct _GS_VECTOR4*)makenuvec4(lightpos.x, lightpos.y, lightpos.z, 0.0f);
                     
-                    if (i != lights) {
-                        NuRndrItem(rndritem);
+                    if (i == lights) {
+                        break;
                     }
+                    NuRndrItem(rndritem);
                     
                     if (i == 0) {
                         GS_SetBlendSrc(1, 4, 5);
@@ -658,7 +659,7 @@ void SetupShaders(struct nugeomitem_s* geomitem) {
         case DYNAMICWATER: // 27
             CV_WORLDVIEWPROJ = *(struct _GSMATRIX*) &matWorldViewProj;
             CV_WORLD_0 = *(struct _GSMATRIX*) &matWorld;
-            CV_SHADER_PARAMS = *(struct _GS_VECTOR4 *)makenuvec4((mtl->fx2.f32 / mtl->fx4.f32) * 0.02083333f,
+            CV_SHADER_PARAMS = *(struct _GS_VECTOR4 *)makenuvec4((mtl->fx2.f32 / mtl->fx4.f32) * 0.020833334f,
                                          mtl->fx3.f32 / mtl->fx4.f32, mtl->fx4.f32, 0.0f);
             CV_CONSTANTS = *(struct _GS_VECTOR4*)makenuvec4(0.0f, 1.0f, 2.0f, dynamicWaterScale);
             CV_MTL_COLOR = *(struct _GS_VECTOR4*)makenuvec4(mtl->diffuse.r, mtl->diffuse.g, mtl->diffuse.b, dynamicWaterBlend);

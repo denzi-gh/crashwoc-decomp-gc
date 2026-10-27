@@ -129,11 +129,13 @@ static void NuDynamicWaterCalcShaderUVOffsets(s32 width, s32 height, float multi
     return;
 }
 
-//99.5% BLOCKER - 1 instruction regalloc diff: target has extra mr r9,r0 before attrib.alpha rlwimi.
+//99.5% BLOCKER - target has extra mr r9,r0 before attrib.alpha rlwimi.
 // Target: rlwinm r0 (colour=0) -> mr r9,r0 -> rlwimi r9 (alpha=1) -> stw r9 -> lwzx r0 (tid)
 // Ours:   rlwinm r0 (colour=0) ->            rlwimi r0 (alpha=1) -> stw r0 -> lwzx r9 (tid)
-// Functionally equivalent, pure register allocator choice in ProDG/GCC 2.95.2 -O2.
+// RTL dump: combine folds the colour clear into alpha's destination pseudo-register,
+// removing the intermediate copy before register allocation (ProDG/GCC 2.95.2 -O2).
 // Attempted: reordering assignments, local ptr variable, interleaving tid load, swapping fxid/alpha_sort.
+// Also tested local attrib copies and a packed alpha mask; none improved 99.5%.
 static void NuDynamicWaterInit(void) {
     s32 i;
     struct nutex_s tex;

@@ -402,17 +402,20 @@ float ** NuHGobjEvalDwa2(int nlayers,short *layers,struct nuanimdata2_s *vtxanim
 
 
 union variptr_u vpdmatag_curr;
-/*
-
 //MATCH NGC
 static union variptr_u vpDmaTag_RetEx(union variptr_u ptr) {
-    static struct _sceDmaTag dmatag = {0, 0, 1, NULL};
+    static struct gc_dmatag_s {
+        unsigned short qwc;
+        unsigned char mark;
+        unsigned char id;
+        struct _sceDmaTag *next;
+    } dmatag = {0, 0, 1, NULL};
 
     vpdmatag_curr = ptr;
     
-    *ptr.dmatag = dmatag;
+    *(struct gc_dmatag_s *)ptr.voidptr = dmatag;
 
-    ptr.dmatag++;
+    ptr.voidptr = (struct gc_dmatag_s *)ptr.voidptr + 1;
     
     return ptr;
 }
@@ -429,13 +432,13 @@ static union variptr_u vpDmaTag_Close(union variptr_u ptr) {
 
 //MATCH NGC
 struct sceDmaTag * CreateDmaParticleSet(void *buffer,s32 *size) {
-    s32 lp;
     union variptr_u buff;
-    struct debris_s *temp;
+    s32 lp;
+    struct uv1deb *temp;
 
     buff.voidptr = buffer;
     buff = vpDmaTag_RetEx(buff);
-    temp = (struct debris_s*)buff.voidptr;
+    temp = (struct uv1deb*)buff.voidptr;
     for (lp = 0; lp < 0x20; lp++, temp++) {
         temp->x = 1.0f;
         temp->y = 2.0f;
@@ -453,29 +456,28 @@ struct sceDmaTag * CreateDmaParticleSet(void *buffer,s32 *size) {
 }
 
 //MATCH NGC
-struct DmaDebTypePointer * CreateDmaPartEffectList(void *buffer,int *size) {
+struct PartHeader_testretail * CreateDmaPartEffectList(void *buffer,int *size) {
     union variptr_u buff;
     union variptr_u start;
-    struct pDat* PartData;
-    struct DmaDebTypePointer* PartStart;
+    struct PartList_s* PartData;
+    struct PartHeader_testretail* PartStart;
     s32 lp;
 
     start.voidptr = buffer;
     vpDmaTag_RetEx(start);
-    ((struct DmaDebTypePointer *)buffer)->v0 = 72.0f;
-    ((struct DmaDebTypePointer *)buffer)->grav = 0.0f;
-    ((struct DmaDebTypePointer *)buffer)->u0 = 56.0f;
-    ((struct DmaDebTypePointer *)buffer)->u1 = 200.0f;
-    ((struct DmaDebTypePointer *)buffer)->v1 = 72.0f;
-    PartData = &((struct DmaDebTypePointer *)buffer)->Data[0];
+    ((struct PartHeader_testretail *)buffer)->v0 = 72.0f;
+    ((struct PartHeader_testretail *)buffer)->grav = 0.0f;
+    ((struct PartHeader_testretail *)buffer)->u0 = 56.0f;
+    ((struct PartHeader_testretail *)buffer)->u1 = 200.0f;
+    ((struct PartHeader_testretail *)buffer)->v1 = 72.0f;
+    PartData = &((struct PartHeader_testretail *)buffer)->Data[0];
     for (lp = 0; lp < 64; lp++) {
         PartData++;
     }
     buff.voidptr = PartData;
     *size = (int)vpDmaTag_Close(buff).voidptr - (int)buffer;
-    return (struct DmaDebTypePointer *)buffer;
+    return (struct PartHeader_testretail *)buffer;
 }
-*/
 
 /*
 struct nupad_s * NuPs2OpenPad(s32 port,s32 slot)
@@ -926,27 +928,32 @@ void NuPs2Init(void)
 }
 
 //NGC MATCH
-void NuGScnUpdate(struct nugscn_s *scn, float dt) {
-    s32 cnt;
-    struct nuinstance_s * i;
-    struct nuinstanim_s * instanim;
-    struct nuanimdata_s * animdata;
-    struct nuanimtime_s atime;
-    struct nuanimdatachunk_s * chunk;
-    struct numtx_s animtx;
-    float ltime;
+void NuGScnUpdate(struct nugscn_s *scn, float dt)
+{
+    void NuAnimCurveSetApplyToMatrix(struct nuanimcurveset_s *animcurveset, struct nuanimtime_s *atime, struct numtx_s *T);
+    void NuAnimDataCalcTime(struct nuanimdata_s *animdata, float time, struct nuanimtime_s *atime);
+    int cnt; // r28
+    struct nuinstance_s * i; // r29
 
     cnt = scn->numinstance;
     i = &scn->instances[cnt];
-    while ( cnt != 0 ) {
+    for (; cnt != 0; )
+    {
         i--;
         cnt--;
+
         if (((i->flags.visible) & i->flags.visitest) < 0) { 
+            struct nuinstanim_s * instanim; // r31
+
             instanim = i->anim;
             if (i->anim != NULL) {
                  if (scn->instanimdata != NULL) {
                     if (scn->instanimdata[i->anim->anim_ix] != NULL) {
-
+                        struct nuanimdata_s * animdata;
+                        struct nuanimtime_s atime; // r1+0x8
+                        struct nuanimdatachunk_s * chunk; // r9
+                        struct numtx_s animtx; // r1+0x20
+                        float ltime; // f31
                         
                         animdata = scn->instanimdata[i->anim->anim_ix];
                         if (instanim->playing) {
@@ -1060,10 +1067,8 @@ float randyfloat(void)
 
 //NGC MATCH
 void NuRndrRectUV2di(s32 x,s32 y,s32 w,s32 h,float tx,float ty,float tw,float th,s32 col,struct numtl_s *mtl) {
-    void NuTexSetTexture();
     void NuMtlSetRenderStates();
-
-    struct nuvtx_tltc1_s vtx [7];
+    struct nuvtx_tltc1_s vtx [6];
 
     GS_SetOrthMatrix();
 
@@ -1115,13 +1120,13 @@ void NuRndrRectUV2di(s32 x,s32 y,s32 w,s32 h,float tx,float ty,float tw,float th
     vtx[5].tc[0] = tx;
     vtx[5].tc[1] = vtx[2].tc[1];
 
-    //ResetShaders();
+    ResetShaders();
     NuTexSetTexture(0,0);
     NuMtlSetRenderStates(mtl);
     NuTexSetTextureStates(mtl);
-    //SetVertexShader(0x144);
+    SetVertexShader(0x144);
     NuTexSetTexture(0, mtl->tid);
-    //GS_DrawTriListTTL(vtx, 6);
+    GS_DrawTriListTTL((struct _GS_VERTEXTL *)vtx, 6);
     return;
 }
 

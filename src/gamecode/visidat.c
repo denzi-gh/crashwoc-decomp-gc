@@ -89,280 +89,196 @@ struct visbndassoc_s {
     s32 visend_ix;
 };
 
-struct visidata_s* visiLoadData(char* fname, struct nugscn_s* sc, union variptr_u* buff) {
-    struct visidata_s* vd;
-    s32* fdatabase;
-    s32* fdata;
-    s32 numassoc;
-    s32 numbnd;
-    s32 splen;
-    struct nugobj_s* g;
+//NGC MATCH
+struct visidata_s *visiLoadData(char *fname, struct nugscn_s *sc, union variptr_u *buff) {
+    struct visidata_s *vd;
+    union variptr_u fdatabase;
+    union variptr_u fdata;
+    int numassoc;
+    int numbnd;
+    int splen;
+    struct nugobj_s *g;
     struct nuvec_s wpos;
-    s32 gcnt;
-    s32 n;
-    s32 m;
-    s32 o;
-    s32 p;
-    s32 tmpsize;
-    s32 spline_used;
-    struct visbndassoc_s* assocs;
-    unsigned long long* tmpalloc;
-    unsigned long long* binfo;
-    s32 binfosize;
-    s32 ver;
-    unsigned long long* binfo_data;
-    s32 allocSize;
-    s32 binfobytes;
-    unsigned long long deltatot;
-    unsigned long long delta;
+    int gcnt;
+    int n;
+    int m;
+    int o;
+    int p;
+    int binfix;
+    int tmpsize;
+    int spline_used;
+    struct visbndassoc_s *assocs;
+    u64 *binfo;
+    u64 *tmpalloc;
+    u64 *tmpdelta;
+    int binfosize;
+    int ver;
 
-    fdatabase = (s32*)NuFileLoad(fname);
-    vd = NULL;
-    if (fdatabase != NULL) {
-        vd = (struct visidata_s*)buff->voidptr;
-        fdata = fdatabase + 1;
+    vd = 0;
+    fdatabase.voidptr = NuFileLoad(fname);
+    if (fdatabase.voidptr != 0) {
+        fdata.s32 = fdatabase.s32 + 1;
+        vd = buff->voidptr;
         buff->intaddr += sizeof(struct visidata_s);
         memset(vd, 0, sizeof(struct visidata_s));
-
         vd->sc = sc;
-        vd->curknot = -1;
         vd->curspline = -1;
+        vd->curknot = -1;
+        vd->vspline = buff->voidptr;
+        buff->intaddr += sc->numsplines * 4;
 
-        vd->vspline = (void***)buff->voidptr;
-        buff->u32 += sc->numsplines;
-
-        ver = fdatabase[0];
+        ver = fdatabase.s32[0];
         if (ver < 0) {
-            numbnd = fdatabase[1];
-            fdata++;
+            numbnd = fdatabase.s32[1];
+            fdata.s32++;
         } else {
             numbnd = ver;
         }
 
         binfosize = (vd->sc->numinstance + 63) / 64;
         vd->binfosize = binfosize;
-
-        allocSize = binfosize * numbnd * 8;
-        tmpalloc = (unsigned long long*)NuMemAlloc(allocSize);
-        if (tmpalloc == NULL) {
-            NuErrorProlog(__FILE__, __LINE__)("unable to alloc %d bytes", allocSize);
+        tmpalloc = NuMemAlloc(binfosize * numbnd * 8);
+        if (tmpalloc == 0) {
+            NuErrorProlog("C:/source/crashwoc/code/gamecode/visidat.c", 0xAD)("unable to alloc %d bytes", binfosize * numbnd * 8);
         }
-
-        binfobytes = binfosize * 8;
 
         for (o = 0; o < numbnd; o++) {
-            unsigned long long mask;
-            unsigned long long* base;
+            u64 mask;
 
-            splen = *fdata;
-            fdata++;
-
-            base = &tmpalloc[o * binfosize];
-            base[0] = 0;
-
+            splen = *fdata.s32++;
+            binfix = o * binfosize;
+            tmpalloc[binfix] = 0;
             mask = 1;
             for (n = 0; n < vd->sc->numinstance; n++) {
-                g = sc->gobjs[sc->instances[n].objid];
-                if (g->ngobjs > 0) {
-                    s32 ngobj = g->ngobjs;
-                    unsigned long long* curbase = base;
-                    do {
-                        NuVecMtxTransform(&wpos, &g->bounding_box_center, (struct Mtx*)&vd->sc->instances[n].mtx);
-                        if (PtInsideFBound(&wpos, splen, (struct nuvec_s*)fdata)) {
-                            *curbase |= mask;
-                        }
-                        g++;
-                        ngobj--;
-                    } while (ngobj != 0);
-                }
-
-                {
-                    unsigned long long newmask = mask << 1;
-                    mask = newmask;
-                    if (mask == 0) {
-                        mask = 1;
-                        base++;
+                g = vd->sc->gobjs[vd->sc->instances[n].objid];
+                gcnt = g->ngobjs;
+                for (m = 0; m < gcnt; m++) {
+                    NuVecMtxTransform(&wpos, &g->bounding_box_center, (struct Mtx*)&vd->sc->instances[n].mtx);
+                    if (PtInsideFBound(&wpos, splen, fdata.vec3)) {
+                        tmpalloc[binfix] |= mask;
                     }
+                    g++;
+                }
+                mask <<= 1;
+                if (mask == 0) {
+                    binfix++;
+                    mask = 1;
                 }
             }
-
-            fdata = (s32*)((char*)fdata + splen * sizeof(struct nuvec_s));
+            fdata.vec3 += splen;
         }
 
-        numassoc = *fdata;
-        assocs = (struct visbndassoc_s*)(fdata + 1);
+        numassoc = *fdata.s32++;
+        assocs = fdata.voidptr;
 
         if (ver < 0) {
-            s32 numsplinenames;
-            s32* spix;
-            char* spname;
-            s32* splused;
+            union variptr_u splused;
+            int *spix;
+            char *spname;
 
-            splused = (s32*)((char*)assocs + numassoc * sizeof(struct visbndassoc_s));
-            numsplinenames = *splused;
-
-            if (numsplinenames != 0) {
-                s32 ix;
-                spix = (s32*)NuMemAlloc(numsplinenames * 4);
-                spname = (char*)(splused + 1);
-
-                for (ix = 0; (u32)ix < (u32)numsplinenames; ix++) {
-                    spix[ix] = -1;
-
+            splused.voidptr = &assocs[numassoc];
+            if ((*splused.u32) != 0) {
+                spix = NuMemAlloc((*splused.u32) * 4);
+                spname = splused.charptr + 4;
+                for (o = 0; o < (*splused.u32); o++) {
+                    spix[o] = -1;
                     for (n = 0; n < sc->numsplines; n++) {
                         if (strcmp(sc->splines[n].name, spname) == 0) {
-                            spix[ix] = n;
+                            spix[o] = n;
                             break;
                         }
                     }
-
-                    while (*spname != '\0') {
+                    while (*spname != 0) {
                         spname++;
                     }
                     spname++;
                 }
-
-                if (numassoc > 0) {
-                    struct visbndassoc_s* ap = assocs;
-                    s32 cnt = numassoc;
-                    do {
-                        s32 resolved = spix[ap->visspline];
-                        ap->visspline = resolved;
-                        if (resolved < 0) {
-                            ap->visspline = 0;
-                            ap->visstart_ix = 0;
-                            ap->visend_ix = 1;
-                        }
-                        ap++;
-                        cnt--;
-                    } while (cnt != 0);
+                for (o = 0; o < numassoc; o++) {
+                    assocs[o].visspline = spix[assocs[o].visspline];
+                    if (assocs[o].visspline < 0) {
+                        assocs[o].visspline = 0;
+                        assocs[o].visstart_ix = 0;
+                        assocs[o].visend_ix = 1;
+                    }
                 }
-
                 NuMemFree(spix);
             }
         }
 
-        binfo = (unsigned long long*)NuMemAlloc(binfobytes);
+        binfo = NuMemAlloc(binfosize * 8);
         tmpsize = 0;
-        binfo_data = NULL;
-
-        if (binfo == NULL) {
-            NuErrorProlog(__FILE__, __LINE__)("unable to alloc %d bytes", binfobytes);
+        tmpdelta = 0;
+        if (binfo == 0) {
+            NuErrorProlog("C:/source/crashwoc/code/gamecode/visidat.c", 0xFB)("unable to alloc %d bytes", binfosize * 8);
         }
 
         for (o = 0; o < vd->sc->numsplines; o++) {
             spline_used = 0;
-
-            for (m = 0; m < numassoc; m++) {
-                if (assocs[m].visspline != o) {
+            for (n = 0; n < numassoc; n++) {
+                if (assocs[n].visspline != o) {
                     continue;
                 }
-
                 if (spline_used == 0) {
-                    s32 needed;
-                    s32 splinelen;
-
-                    splinelen = vd->sc->splines[o].len;
-                    needed = splinelen * binfosize;
-
-                    if (needed > tmpsize) {
-                        if (binfo_data != NULL) {
-                            NuMemFree(binfo_data);
+                    if (vd->sc->splines[o].len * binfosize > tmpsize) {
+                        if (tmpdelta != 0) {
+                            NuMemFree(tmpdelta);
                         }
-                        splinelen = vd->sc->splines[o].len;
-                        tmpsize = splinelen * binfosize + 1;
-                        binfo_data = (unsigned long long*)NuMemAlloc(tmpsize * 8);
-                        if (binfo_data == NULL) {
-                            NuErrorProlog(__FILE__, __LINE__)("unable to alloc %d bytes", tmpsize * 8);
+                        tmpsize = vd->sc->splines[o].len * binfosize + 1;
+                        tmpdelta = NuMemAlloc(tmpsize * 8);
+                        if (tmpdelta == 0) {
+                            NuErrorProlog("C:/source/crashwoc/code/gamecode/visidat.c", 0x10D)("unable to alloc %d bytes", tmpsize * 8);
                         }
                     }
-                    memset(binfo_data, 0, tmpsize * 8);
+                    memset(tmpdelta, 0, tmpsize * 8);
                 }
-
                 spline_used = 1;
-
-                {
-                    s32 start_ix;
-                    s32 end_ix;
-                    s32 splinelen;
-
-                    splinelen = vd->sc->splines[o].len;
-                    start_ix = assocs[m].visstart_ix;
-                    if (splinelen > start_ix) {
-                        splinelen = start_ix;
+                assocs[n].visstart_ix = (assocs[n].visstart_ix < vd->sc->splines[o].len)
+                                            ? assocs[n].visstart_ix : vd->sc->splines[o].len;
+                assocs[n].visend_ix = (assocs[n].visend_ix < vd->sc->splines[o].len)
+                                          ? assocs[n].visend_ix : vd->sc->splines[o].len;
+                for (m = assocs[n].visstart_ix; m <= assocs[n].visend_ix; m++) {
+                    for (p = 0; p < binfosize; p++) {
+                        tmpdelta[m * binfosize + p] |= tmpalloc[assocs[n].bndspline * binfosize + p];
                     }
-                    assocs[m].visstart_ix = splinelen;
-                    n = splinelen;
-
-                    end_ix = assocs[m].visend_ix;
-                    splinelen = vd->sc->splines[o].len;
-                    if (splinelen > end_ix) {
-                        splinelen = end_ix;
-                    }
-
-                    assocs[m].visend_ix = splinelen;
-
-                    if (n > splinelen) {
-                        continue;
-                    }
-
-                    do {
-                        for (p = 0; p < binfosize; p++) {
-                            binfo_data[n * binfosize + p] |= tmpalloc[assocs[m].bndspline * binfosize + p];
-                        }
-                        n++;
-                    } while (n <= assocs[m].visend_ix);
                 }
             }
 
             if (spline_used != 0) {
-                vd->vspline[o] = (void**)buff->voidptr;
-
+                vd->vspline[o] = buff->voidptr;
                 buff->intaddr += vd->sc->splines[o].len * 8;
-
                 memset(vd->vspline[o], 0, vd->sc->splines[o].len * 8);
-
                 buff->intaddr = (buff->intaddr + 7) & ~7;
-
                 for (n = 0; n < vd->sc->splines[o].len; n++) {
-                    deltatot = 0;
-                    for (p = 0; p < binfosize; p++) {
+                    u64 deltatot = 0;
+                    for (m = 0; m < binfosize; m++) {
                         if (n == 0) {
-                            binfo[p] = binfo_data[p];
+                            binfo[m] = tmpdelta[m];
                         } else {
-                            binfo[p] = binfo_data[(n - 1) * binfosize + p] ^ binfo_data[n * binfosize + p];
+                            binfo[m] = tmpdelta[(n - 1) * binfosize + m] ^ tmpdelta[n * binfosize + m];
                         }
-                        deltatot |= binfo[p];
+                        deltatot |= binfo[m];
                     }
-
                     if (deltatot != 0) {
-                        vd->vspline[o][n] = (void*)buff->u32;
-
-                        for (p = 0; p < binfosize; p++) {
-                            *buff->u64 = binfo_data[n * binfosize + p];
-                            buff->u64++;
+                        vd->vspline[o][n] = buff->u64;
+                        for (m = 0; m < binfosize; m++) {
+                            *buff->u64++ = tmpdelta[n * binfosize + m];
                         }
                     }
                 }
             }
         }
 
-        if (binfo_data != NULL) {
-            NuMemFree(binfo_data);
+        if (tmpdelta != 0) {
+            NuMemFree(tmpdelta);
         }
-
-        if (ver != 0) {
+        if (binfo != 0) {
             NuMemFree(binfo);
         }
-
-        if (tmpalloc != NULL) {
+        if (tmpalloc != 0) {
             NuMemFree(tmpalloc);
         }
-
-        NuMemFree(fdatabase);
-
+        NuMemFree(fdatabase.voidptr);
         buff->intaddr = (buff->intaddr + 15) & ~15;
     }
-
     return vd;
 }

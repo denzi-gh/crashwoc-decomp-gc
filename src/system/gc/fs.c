@@ -1,4 +1,10 @@
 #include "fs.h"
+#include "nucore/nufile.h"
+
+void DVDInit(void);
+s32 DVDOpen(char *filename, struct DVDFileInfo *fileInfo);
+void StreamClear(void);
+void GC_DiskErrorPoll(void);
 
 /*
 //NGC MATCH
@@ -86,7 +92,7 @@ void GC_DiskErrorPoll(void) {
                     GS_EndScene();
                     GS_FlipScreen();
                     do {
-                            /* WARNING: Do nothing block with infinite loop */
+                            // WARNING: Do nothing block with infinite loop
                     } while( 1 );
                 }
         PrintError = 0;
@@ -95,11 +101,9 @@ void GC_DiskErrorPoll(void) {
 */
 
 
-/*
-//97%
 s32 GCFileOpen(char *filename) {
     if (FSStart == 0) {
-        memset(&MAHFile,0,0x3c);
+        memset(&MAHFile,0,sizeof(MAHFile));
         FSStart = 1;
         DVDInit();
     }
@@ -110,9 +114,8 @@ s32 GCFileOpen(char *filename) {
         fileoffset = 0;
         return 1;
     }
-    
     return 0;
-}*/
+}
 
 //NGC MATCH
 s32 GCFileSize(s32 fd) {

@@ -1,11 +1,51 @@
 #include "system/crashlib.h"
 
+static struct nuvec_s* ed_loc = NULL;
+struct _PERFTIMER timers[20];
+u32 GS_BufferSize = 0;
+u32 BufferTypes[4];
 
+//MATCH GCN
+void edmainRegisterLocVec(struct nuvec_s* loc) {
+    ed_loc = loc;
+}
+
+//MATCH GCN
+struct nuvec_s* edmainQueryLocVec(void) {
+    return ed_loc;
+}
 
 //MATCH GCN
 unsigned long timeGetTime(void) {
 	return 0;
     //return OSGetTick(); //SDK GCN
+}
+
+//MATCH GCN
+int tbsetCreate(int* cols) {
+    return 0;
+}
+
+//MATCH GCN
+void tbslotBegin(int tbh, int slotix) {
+    unsigned long time;
+
+    time = timeGetTime();
+    timers[slotix].start = time;
+}
+
+//MATCH GCN
+void tbslotEnd(int tbh, int slotix) {
+    unsigned long avg;
+    unsigned long time;
+    unsigned long elapsed;
+
+    time = timeGetTime();
+    avg = timers[slotix].average;
+    elapsed = time - timers[slotix].start;
+    timers[slotix].elapsed = elapsed;
+    timers[slotix].stop = time;
+    timers[slotix].average = (avg + elapsed) >> 1;
 }
 
 //MATCH GCN
@@ -45,7 +85,7 @@ void DBTimerReset(void) {
     return;
 }
 
-//99.63% WIP: only an r7/r10 swap between s and the loop-generated s+1 copy in the row loops
+//99.63% WIP: row-loop register allocation and byte-swap load/store order differ.
 struct D3DTexture* NudxTx_Create(struct nutex_s* texture, s32 rendertargetflag) {
     long data;
     long data2;
@@ -166,9 +206,9 @@ struct D3DTexture* NudxTx_Create(struct nutex_s* texture, s32 rendertargetflag) 
                 data = *inbits32;
                 *outbits = data;
                 alphatest = ((s8*)outbits)[3] / 255.0f;
-                if (alphatest < 0.9f) {
+                if (alphatest < 0.063f) {
                     transparent++;
-                } else if (alphatest > 0.063f) {
+                } else if (alphatest > 0.9f) {
                     solid++;
                 } else {
                     blended++;
@@ -203,9 +243,9 @@ struct D3DTexture* NudxTx_Create(struct nutex_s* texture, s32 rendertargetflag) 
             }
             *outbits = data;
             alphatest = ((s8*)outbits)[0] / 255.0f;
-            if (alphatest < 0.9f) {
+            if (alphatest < 0.063f) {
                 transparent++;
-            } else if (alphatest > 0.063f) {
+            } else if (alphatest > 0.9f) {
                 solid++;
             } else {
                 blended++;
@@ -231,4 +271,27 @@ struct D3DTexture* NudxTx_Create(struct nutex_s* texture, s32 rendertargetflag) 
     free_x(b1);
     DebugText[0] = 0;
     return NULL;
+}
+
+//MATCH GCN
+void* GS_CreateBuffer(u32 length, s32 btype) {
+    void* malloc();
+    struct _GS_BUFFER* bufptr;
+
+    bufptr = (struct _GS_BUFFER*)malloc(length + sizeof(struct _GS_BUFFER));
+    GS_BufferSize += length;
+    bufptr->length = length;
+    bufptr->type = btype;
+    BufferTypes[btype] += length;
+    return bufptr + 1;
+}
+
+//MATCH GCN
+void GS_DeleteBuffer(void* ptr) {
+    void free();
+    struct _GS_BUFFER* bufptr = (struct _GS_BUFFER*)ptr - 1;
+
+    GS_BufferSize -= bufptr->length;
+    BufferTypes[bufptr->type] -= bufptr->length;
+    free(bufptr);
 }
