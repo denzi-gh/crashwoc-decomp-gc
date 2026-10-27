@@ -2,11 +2,11 @@ Crash Bandicoot: The Wrath of Cortex (GameCube)
 [![Build Status]][actions] [![Code Progress]][progress] [![Data Progress]][progress] [![Discord Badge]][discord]
 =============
 
-[Build Status]: https://github.com/denzi-gh/crashwoc-decomp/actions/workflows/decomp-dev.yml/badge.svg
-[actions]: https://github.com/denzi-gh/crashwoc-decomp/actions/workflows/decomp-dev.yml
-[Code Progress]: https://decomp.dev/denzi-gh/crashwoc-decomp.svg?mode=shield&measure=code&label=Code
-[Data Progress]: https://decomp.dev/denzi-gh/crashwoc-decomp.svg?mode=shield&measure=data&label=Data
-[progress]: https://decomp.dev/denzi-gh/crashwoc-decomp
+[Build Status]: https://github.com/denzi-gh/crashwoc-decomp-gc/actions/workflows/decomp-dev.yml/badge.svg
+[actions]: https://github.com/denzi-gh/crashwoc-decomp-gc/actions/workflows/decomp-dev.yml
+[Code Progress]: https://decomp.dev/denzi-gh/crashwoc-decomp-gc.svg?mode=shield&measure=code&label=Code
+[Data Progress]: https://decomp.dev/denzi-gh/crashwoc-decomp-gc.svg?mode=shield&measure=data&label=Data
+[progress]: https://decomp.dev/denzi-gh/crashwoc-decomp-gc
 [Discord Badge]: https://img.shields.io/discord/727908905392275526?color=%237289DA&logo=discord&logoColor=%23FFFFFF
 [discord]: https://discord.gg/kmCPpW4KvJ
 
