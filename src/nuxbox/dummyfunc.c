@@ -1203,7 +1203,7 @@ void* renderpsdma(s32 count, struct rdata_s* rdata, struct PartHeader_testretail
 
     grav /= gravdiv;
     // GC chunks have no unpackdata header: debris starts right after dmadata
-    rdeb = (struct uv1deb*)rdata->unpackdata;
+    rdeb = (struct uv1deb*)rdata->debris;
     ResetShaders();
     GS_SetAlphaCompare(4, 0);
     NuTexSetTexture(0, mtl->tid);
