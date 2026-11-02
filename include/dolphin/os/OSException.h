@@ -23,6 +23,7 @@ extern "C" {
 #define __OS_EXCEPTION_BREAKPOINT           12
 #define __OS_EXCEPTION_SYSTEM_INTERRUPT     13
 #define __OS_EXCEPTION_THERMAL_INTERRUPT    14
+#define __OS_EXCEPTION_PROTECTION           15
 #define __OS_EXCEPTION_MAX                  \
         (__OS_EXCEPTION_THERMAL_INTERRUPT+1)
 

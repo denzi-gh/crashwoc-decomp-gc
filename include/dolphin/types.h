@@ -41,4 +41,6 @@ typedef int BOOL;
 #include "stdarg.h"
 #include "string.h"
 
+#include "cmath.h"
+
 #endif

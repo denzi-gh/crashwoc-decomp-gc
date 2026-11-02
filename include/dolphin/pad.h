@@ -70,6 +70,7 @@ BOOL PADGetType(s32 chan, u32* type);
 BOOL PADSync(void);
 void PADSetAnalogMode(u32 mode);
 PADSamplingCallback PADSetSamplingCallback(PADSamplingCallback callback);
+BOOL __PADDisableRecalibration(BOOL disable);
 
 // Padclamp.c
 void PADClamp(PADStatus * status);

@@ -1,145 +1,83 @@
-#include "types.h"
+#include "dolphin.h"
+#include "dolphin/os.h"
 
-typedef int BOOL;
-#define TRUE 1
-#define FALSE 0
-
-typedef void (*OSResetCallback)(void);
-
-s32 OSDisableInterrupts(void);
-s32 OSRestoreInterrupts(s32);
-void __OSMaskInterrupts(u32);
-s64 __OSGetSystemTime(void);
-
-#define OS_BUS_CLOCK (*(volatile u32*)0x800000F8)
-#define OS_TIMER_CLOCK (OS_BUS_CLOCK / 4)
-
-extern s64 __OSStartTime;
+#include "__os.h"
 
 static OSResetCallback ResetCallback;
-static BOOL Down;
-static BOOL LastState;
-static s64 HoldUp;
-static s64 HoldDown;
+static int Down;
+static int LastState;
+static long long HoldUp;
+static long long HoldDown;
 
-void __OSResetSWInterruptHandler(void) {
-    s64 now;
-    u32 threshold;
+void __OSResetSWInterruptHandler(short exception, struct OSContext *context) {
+    OSResetCallback callback;
 
-    now = __OSGetSystemTime();
-    HoldDown = now;
-
-    threshold = OS_TIMER_CLOCK / 10000;
-
-    while (TRUE) {
-        s64 elapsed;
-        now = __OSGetSystemTime();
-        elapsed = now - HoldDown;
-
-        if (elapsed >= (s64)threshold) break;
-        if (*(volatile u32*)0xCC003000 & 0x00010000) break;
+    HoldDown = __OSGetSystemTime();
+    while (__OSGetSystemTime() - HoldDown < OSMicrosecondsToTicks(100) && !(__PIRegs[0] & 0x10000)) {
+        ;
     }
-
-    if (!(*(volatile u32*)0xCC003000 & 0x00010000)) {
-        Down = TRUE;
-        LastState = TRUE;
+    if (!(__PIRegs[0] & 0x10000)) {
+        Down = 1;
+        LastState = 1;
         __OSMaskInterrupts(0x200);
 
-        if (ResetCallback != NULL) {
-            OSResetCallback cb = ResetCallback;
+        if (ResetCallback) {
+            callback = ResetCallback;
             ResetCallback = NULL;
-            cb();
+            callback();
         }
     }
-
-    *(volatile u32*)0xCC003000 = 2;
+    __PIRegs[0] = 2;
 }
 
-BOOL OSGetResetButtonState(void) {
-    BOOL result;
-    s32 old;
-    s64 now;
+int OSGetResetButtonState() {
+    int enabled;
+    int state;
+    long long now;
+    long long fire;
+    int minutes;
 
-    old = OSDisableInterrupts();
+    enabled = OSDisableInterrupts();
     now = __OSGetSystemTime();
 
-    if (!(*(volatile u32*)0xCC003000 & 0x00010000)) {
-        if (Down == 0) {
-            BOOL valid = TRUE;
-            if (HoldUp != 0) {
-                valid = FALSE;
-            }
-            Down = TRUE;
-            result = valid;
+    if (!(__PIRegs[0] & 0x10000)) {
+        if (!Down) {
+            Down = 1;
+            state = (HoldUp) ? 1 : 0;
             HoldDown = now;
         } else {
-            BOOL valid = TRUE;
-            if (HoldUp == 0) {
-                u32 busClock = OS_BUS_CLOCK;
-                u32 timerClock = busClock >> 2;
-                u32 ticks100 = timerClock / 125000;
-                s64 elapsed = now - HoldDown;
-                ticks100 *= 100;
-                ticks100 >>= 3;
-                if (elapsed < (s64)ticks100) {
-                    valid = FALSE;
-                }
-            }
-            if (valid) {
-                result = TRUE;
-            } else {
-                result = FALSE;
-            }
+            state = (HoldUp || OSMicrosecondsToTicks(100) < (now - HoldDown)) ? 1 : 0;
         }
     } else {
-        if (Down != 0) {
-            s32 last = LastState;
+        if (Down) {
             Down = 0;
-            result = last;
-            if (last) {
+            state = LastState;
+            if (state) {
                 HoldUp = now;
             } else {
                 HoldUp = 0;
             }
+        } else if (HoldUp && (now - HoldUp) < OSMillisecondsToTicks(40)) {
+            state = 1;
         } else {
-            if (HoldUp != 0) {
-                u32 busClock = *(volatile u32*)0x800000F8;
-                u32 timerClock = busClock >> 2;
-                u32 holdThreshold = timerClock / 1000 * 40;
-                s64 elapsed = now - HoldUp;
+            state = 0;
+            HoldUp = 0;
+        }
+    }
+    LastState = state;
 
-                if (elapsed >= (s64)holdThreshold) {
-                    result = TRUE;
-                } else {
-                    HoldUp = 0;
-                    result = FALSE;
-                }
+    minutes = *(u8*)OSPhysicalToCached(0x30E3) & 0x3F;
+    if (minutes) {
+        fire = __OSStartTime + OSSecondsToTicks((long long)(minutes * 60));
+        if (fire < now) {
+            if ((((now - fire) / OS_TIMER_CLOCK / 2) & 1) == 0) {
+                state = 1;
             } else {
-                HoldUp = 0;
-                result = FALSE;
+                state = 0;
             }
         }
     }
 
-    LastState = result;
-
-    {
-        u8 bootByte = *(volatile u8*)0x800030E3;
-        if (bootByte & 0x3F) {
-            u32 timerClock = OS_TIMER_CLOCK;
-            s64 deadline = __OSStartTime + (s64)timerClock * (s64)(bootByte & 0x3F) * 60;
-            if (now >= deadline) {
-                s64 diff = now - deadline;
-                s64 halved = diff / timerClock / 2;
-                if ((halved & 1) == 0) {
-                    result = TRUE;
-                } else {
-                    result = FALSE;
-                }
-            }
-        }
-    }
-
-    OSRestoreInterrupts(old);
-    return result;
+    OSRestoreInterrupts(enabled);
+    return state;
 }

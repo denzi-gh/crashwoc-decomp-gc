@@ -1,389 +1,300 @@
-#include "types.h"
+#include "dolphin.h"
+#include "dolphin/os.h"
+#include "dolphin/db.h"
+#include "dolphin/hw_regs.h"
 
-/* OS function declarations */
-s32 OSDisableInterrupts(void);
-s32 OSRestoreInterrupts(s32 level);
-void __OSMaskInterrupts(u32 mask);
-void __OSUnmaskInterrupts(u32 mask);
-void* __OSSetInterruptHandler(s32 interrupt, void* handler);
+#include "__os.h"
 
-/* Static data (.sdata) */
-static u8 SendCount = 0x80;
+#define EXI_CHAN_2_STAT    (0x28 / 4)
+#define EXI_CHAN_2_CONTROL (0x34 / 4)
+#define EXI_CHAN_2_IMM     (0x38 / 4)
 
-/* Static BSS (.sbss) - order determines memory layout */
-static u32 MTRCallback;
-static u32 DBGCallback;
+#define ROUND_UP(x, align) (((x) + (align) - 1) & (-(align)))
+
+static MTRCallbackType MTRCallback;
+static void (*DBGCallback)(u32, OSContext *);
+
 static u32 SendMailData;
-static u32 RecvDataLeng;
-static u8* pEXIInputFlag;
+static s32 RecvDataLeng;
+
+static u8 *pEXIInputFlag;
 static u8 EXIInputFlag;
 
-static int DBGEXIImm(u8* data, s32 len, s32 type) {
+static u8 SendCount = 0x80;
+
+static void DBGEXIInit(void)
+{
+    __OSMaskInterrupts(OS_INTERRUPTMASK_EXI_2);
+    __EXIRegs[EXI_CHAN_2_STAT] = 0;
+}
+
+static BOOL DBGEXISelect(u32 v)
+{
+    u32 regs = __EXIRegs[EXI_CHAN_2_STAT];
+    regs &= 0x405;
+    regs |= 0x80 | (v << 4);
+    __EXIRegs[EXI_CHAN_2_STAT] = regs;
+    return TRUE;
+}
+
+static BOOL DBGEXIDeselect(void)
+{
+    __EXIRegs[EXI_CHAN_2_STAT] &= 0x405;
+    return TRUE;
+}
+
+static BOOL DBGEXISync(void)
+{
+    while (__EXIRegs[EXI_CHAN_2_CONTROL] & 1) {
+    }
+    return TRUE;
+}
+
+static BOOL DBGEXIImm(void *buffer, s32 bytecounter, u32 write)
+{
+    u8 *tempPointer;
+    u32 writeOutValue;
     int i;
-    u32 val;
 
-    if (type) {
-        val = 0;
-        for (i = 0; i < len; i++) {
-            val |= (u32)data[i] << ((3 - i) * 8);
+    if (write) {
+        tempPointer = buffer;
+        writeOutValue = 0;
+        for (i = 0; i < bytecounter; i++) {
+            u8 *temp = ((u8 *)buffer) + i;
+            writeOutValue |= *temp << ((3 - i) << 3);
         }
-        *(volatile u32*)0xCC006838 = val;
+        __EXIRegs[EXI_CHAN_2_IMM] = writeOutValue;
     }
 
-    *(volatile u32*)0xCC006834 = ((type << 2) | 1) | ((len - 1) << 4);
-    while (*(volatile u32*)0xCC006834 & 1) ;
+    __EXIRegs[EXI_CHAN_2_CONTROL] = 1 | write << 2 | (bytecounter - 1) << 4;
+    DBGEXISync();
 
-    if (!type) {
-        val = *(volatile u32*)0xCC006838;
-        for (i = 0; i < len; i++) {
-            data[i] = (u8)(val >> ((3 - i) * 8));
+    if (!write) {
+        writeOutValue = __EXIRegs[EXI_CHAN_2_IMM];
+        tempPointer = buffer;
+        for (i = 0; i < bytecounter; i++) {
+            *tempPointer++ = writeOutValue >> ((3 - i) << 3);
         }
     }
-
-    return 1;
+    return TRUE;
 }
 
-static int DBGReadMailbox(u32* data) {
-    volatile u32* exi = (volatile u32*)0xCC006800;
-    u32 cmd;
-    int err;
+static BOOL DBGWriteMailbox(u32 p1)
+{
+    BOOL total = FALSE;
+    u32 v;
 
-    u32 csr = exi[0x28 / 4];
-    csr = (csr & 0x405) | 0xc0;
-    exi[0x28 / 4] = csr;
-
-    cmd = 0x60000000;
-    err = !DBGEXIImm((u8*)&cmd, 2, 1);
-
-    while (exi[0x34 / 4] & 1) ;
-
-    err |= !DBGEXIImm((u8*)data, 4, 0);
-
-    while (exi[0x34 / 4] & 1) ;
-
-    csr = exi[0x28 / 4];
-    exi[0x28 / 4] = csr & 0x405;
-
-    return !err;
-}
-
-static int DBGRead(s32 cmd, u8* dest, s32 len) {
-    volatile u32* exi = (volatile u32*)0xCC006800;
-    u32 cmd_buf;
-    int err;
-
-    u32 csr = exi[0x28 / 4];
-    csr = (csr & 0x405) | 0xc0;
-    exi[0x28 / 4] = csr;
-
-    cmd_buf = ((u32)(cmd << 8) & 0x01FFFC00) | 0x20000000;
-    err = !DBGEXIImm((u8*)&cmd_buf, 4, 1);
-
-    while (exi[0x34 / 4] & 1) ;
-
-    while (len != 0) {
-        u32 tmp;
-        err |= !DBGEXIImm((u8*)&tmp, 4, 0);
-        while (exi[0x34 / 4] & 1) ;
-        *(u32*)dest = tmp;
-        dest += 4;
-        len -= 4;
-        if (len < 0) len = 0;
+    if (!DBGEXISelect(4)) {
+        return FALSE;
     }
-
-    csr = exi[0x28 / 4];
-    exi[0x28 / 4] = csr & 0x405;
-
-    return !err;
+    v = (p1 & 0x1FFFFFFF) | 0xC0000000;
+    total |= !DBGEXIImm(&v, sizeof(v), 1);
+    total |= !DBGEXISync();
+    total |= !DBGEXIDeselect();
+    return !total;
 }
 
-static int DBGWrite(s32 cmd, u8* src, s32 len) {
-    volatile u32* exi = (volatile u32*)0xCC006800;
-    u32 cmd_buf;
-    int err;
+static BOOL DBGReadMailbox(u32 *p1)
+{
+    BOOL total = FALSE;
+    u32 v;
 
-    u32 csr = exi[0x28 / 4];
-    csr = (csr & 0x405) | 0xc0;
-    exi[0x28 / 4] = csr;
-
-    cmd_buf = ((u32)(cmd << 8) & 0x01FFFC00) | 0xA0000000;
-    err = !DBGEXIImm((u8*)&cmd_buf, 4, 1);
-
-    while (exi[0x34 / 4] & 1) ;
-
-    while (len != 0) {
-        u32 tmp = *(u32*)src;
-        err |= !DBGEXIImm((u8*)&tmp, 4, 1);
-        while (exi[0x34 / 4] & 1) ;
-        src += 4;
-        len -= 4;
-        if (len < 0) len = 0;
+    if (!DBGEXISelect(4)) {
+        return FALSE;
     }
-
-    csr = exi[0x28 / 4];
-    exi[0x28 / 4] = csr & 0x405;
-
-    return !err;
+    v = 0x60000000;
+    total |= !DBGEXIImm(&v, 2, 1);
+    total |= !DBGEXISync();
+    total |= !DBGEXIImm(p1, 4, 0);
+    total |= !DBGEXISync();
+    total |= !DBGEXIDeselect();
+    return !total;
 }
 
-static int DBGReadStatus(u32* data) {
-    volatile u32* exi = (volatile u32*)0xCC006800;
-    u32 cmd;
-    int err;
+static BOOL DBGRead(u32 count, void *buffer, s32 param3)
+{
+    BOOL total = FALSE;
+    u32 *buf_p = (u32 *)buffer;
+    u32 v1;
+    u32 v;
 
-    u32 csr = exi[0x28 / 4];
-    csr = (csr & 0x405) | 0xc0;
-    exi[0x28 / 4] = csr;
-
-    cmd = 0x40000000;
-    err = !DBGEXIImm((u8*)&cmd, 2, 1);
-
-    while (exi[0x34 / 4] & 1) ;
-
-    err |= !DBGEXIImm((u8*)data, 4, 0);
-
-    while (exi[0x34 / 4] & 1) ;
-
-    csr = exi[0x28 / 4];
-    exi[0x28 / 4] = csr & 0x405;
-
-    return !err;
+    if (!DBGEXISelect(4)) {
+        return FALSE;
+    }
+    v1 = (count & 0x1FFFC) << 8 | 0x20000000;
+    total |= !DBGEXIImm(&v1, sizeof(v1), 1);
+    total |= !DBGEXISync();
+    while (param3) {
+        total |= !DBGEXIImm(&v, sizeof(v), 0);
+        total |= !DBGEXISync();
+        *buf_p++ = v;
+        param3 -= 4;
+        if (param3 < 0) {
+            param3 = 0;
+        }
+    }
+    total |= !DBGEXIDeselect();
+    return !total;
 }
 
-static void MWCallback(s16 irq) {
-    EXIInputFlag = 1;
+static BOOL DBGWrite(u32 count, void *buffer, s32 param3)
+{
+    BOOL total = FALSE;
+    u32 *buf_p = (u32 *)buffer;
+    u32 v1;
+    u32 v;
+
+    if (!DBGEXISelect(4)) {
+        return FALSE;
+    }
+    v1 = (count & 0x1FFFC) << 8 | 0xA0000000;
+    total |= !DBGEXIImm(&v1, sizeof(v1), 1);
+    total |= !DBGEXISync();
+    while (param3 != 0) {
+        v = *buf_p++;
+        total |= !DBGEXIImm(&v, sizeof(v), 1);
+        total |= !DBGEXISync();
+        param3 -= 4;
+        if (param3 < 0) {
+            param3 = 0;
+        }
+    }
+    total |= !DBGEXIDeselect();
+    return !total;
+}
+
+static BOOL DBGReadStatus(u32 *p1)
+{
+    BOOL total = FALSE;
+    u32 v;
+
+    if (!DBGEXISelect(4)) {
+        return FALSE;
+    }
+    v = 1 << 30;
+    total |= !DBGEXIImm((u8 *)&v, 2, 1);
+    total |= !DBGEXISync();
+    total |= !DBGEXIImm(p1, 4, 0);
+    total |= !DBGEXISync();
+    total |= !DBGEXIDeselect();
+    return !total;
+}
+
+static void MWCallback(u32 a, OSContext *b)
+{
+    EXIInputFlag = TRUE;
     if (MTRCallback) {
-        ((void (*)(s32))MTRCallback)(0);
+        MTRCallback(0);
     }
 }
 
-static void DBGHandler(s16 irq) {
-    *(volatile u32*)0xCC003000 = 0x1000;
+static void DBGHandler(s16 a, OSContext *b)
+{
+    *__PIRegs = 0x1000;
     if (DBGCallback) {
-        ((void (*)(s16))DBGCallback)(irq);
+        DBGCallback(a, b);
     }
 }
 
-void DBInitComm(u8** ppFlag, u32 callback) {
-    s32 level = OSDisableInterrupts();
-    pEXIInputFlag = &EXIInputFlag;
-    *ppFlag = pEXIInputFlag;
-    MTRCallback = callback;
-    __OSMaskInterrupts(0x18000);
-    *(volatile u32*)0xCC006828 = 0;
-    OSRestoreInterrupts(level);
+void DBInitComm(u8 **a, MTRCallbackType b)
+{
+    BOOL interrupts = OSDisableInterrupts();
+    {
+        pEXIInputFlag = &EXIInputFlag;
+        *a = pEXIInputFlag;
+        MTRCallback = b;
+        DBGEXIInit();
+    }
+    OSRestoreInterrupts(interrupts);
 }
 
-void DBInitInterrupts(void) {
-    __OSMaskInterrupts(0x18000);
-    __OSMaskInterrupts(0x40);
-    DBGCallback = (u32)MWCallback;
-    __OSSetInterruptHandler(25, (void*)DBGHandler);
-    __OSUnmaskInterrupts(0x40);
+void DBInitInterrupts(void)
+{
+    __OSMaskInterrupts(OS_INTERRUPTMASK_EXI_2);
+    __OSMaskInterrupts(OS_INTERRUPTMASK_PI_DEBUG);
+    DBGCallback = &MWCallback;
+    __OSSetInterruptHandler(__OS_INTERRUPT_PI_DEBUG, DBGHandler);
+    __OSUnmaskInterrupts(OS_INTERRUPTMASK_PI_DEBUG);
 }
 
-s32 DBQueryData(void) {
-    s32 level = 0;
-    u32 status;
+static void CheckMailBox(void)
+{
+    u32 v;
+
+    DBGReadStatus(&v);
+    if (v & 1) {
+        DBGReadMailbox(&v);
+        v &= 0x1FFFFFFF;
+        if ((v & 0x1F000000) == 0x1F000000) {
+            SendMailData = v;
+            RecvDataLeng = v & 0x7FFF;
+            EXIInputFlag = 1;
+        }
+    }
+}
+
+int DBQueryData(void)
+{
+    BOOL interrupts;
 
     EXIInputFlag = 0;
-
     if (RecvDataLeng == 0) {
-        level = OSDisableInterrupts();
-
-        DBGReadStatus(&status);
-        if (status & 1) {
-            DBGReadMailbox(&status);
-            status &= 0x1FFFFFFF;
-
-            if ((status & 0x1F000000) == 0x1F000000) {
-                SendMailData = status;
-                RecvDataLeng = status & 0x7FFF;
-                EXIInputFlag = 1;
-            }
-        }
+        interrupts = OSDisableInterrupts();
+        CheckMailBox();
     }
-
-    OSRestoreInterrupts(level);
-
+    OSRestoreInterrupts(interrupts);
     return RecvDataLeng;
 }
 
-s32 DBRead(u8* data, s32 len) {
-    s32 level = OSDisableInterrupts();
-    s32 cmd;
+BOOL DBRead(void *buffer, int count)
+{
+    u32 interrupts = OSDisableInterrupts();
+    u32 v = SendMailData & 0x10000 ? 0x1000 : 0;
 
-    if (SendMailData & 0x10000) {
-        cmd = 0x1000;
-    } else {
-        cmd = 0;
-    }
-
-    DBGRead(cmd + 0x1E000, data, (len + 3) & ~3);
-
+    DBGRead(v + 0x1E000, buffer, ROUND_UP(count, 4));
     RecvDataLeng = 0;
     EXIInputFlag = 0;
-
-    OSRestoreInterrupts(level);
+    OSRestoreInterrupts(interrupts);
     return 0;
 }
 
-s32 DBWrite(u8* data, s32 len) {
-    s32 level;
-    volatile u32* exi;
-    u32 status;
-    u32 cmd_buf;
-    int err;
-    s32 cmd;
-    s32 roundedLen;
+BOOL DBWrite(const void *src, int size)
+{
+    u32 v;
+    u32 busyFlag;
+    BOOL interrupts;
 
-    level = OSDisableInterrupts();
-    exi = (volatile u32*)0xCC006800;
-
-    /* Wait until device is ready (status bit 1 clear) */
+    interrupts = OSDisableInterrupts();
     do {
-        u32 csr = *(volatile u32*)0xCC006828;
-        volatile u32* csr_ptr = (volatile u32*)0xCC006828;
-        csr &= 0x405;
-        csr |= 0xc0;
-        *csr_ptr = csr;
+        DBGReadStatus(&busyFlag);
+    } while (busyFlag & 2);
 
-        cmd_buf = 0x40000000;
-        err = !DBGEXIImm((u8*)&cmd_buf, 2, 1);
-
-        while (exi[0x34 / 4] & 1) ;
-
-        DBGEXIImm((u8*)&status, 4, 0);
-
-        while (exi[0x34 / 4] & 1) ;
-
-        csr = *(volatile u32*)0xCC006828;
-        csr &= 0x405;
-        *(volatile u32*)0xCC006828 = csr;
-    } while (status & 2);
-
-    /* Increment send count */
     SendCount++;
-    if (SendCount & 1) {
-        cmd = 0x1000;
-    } else {
-        cmd = 0;
+    v = ((SendCount & 1) ? 0x1000 : 0);
+    while (!DBGWrite(v | 0x1C000, (u32 *)src, ROUND_UP(size, 4))) {
     }
 
-    roundedLen = (len + 3) & ~3;
-    cmd = (cmd | 0x10000) | 0xC000;
-
-    /* Send data - retry until success */
     do {
-        err = DBGWrite(cmd, data, roundedLen);
-    } while (err == 0);
+        DBGReadStatus(&busyFlag);
+    } while (busyFlag & 2);
 
-    /* Write mailbox - wait for ack */
-    do {
-        u32 csr;
-        volatile u32* csr_ptr = (volatile u32*)0xCC006828;
-
-        csr = *csr_ptr;
-        csr &= 0x405;
-        csr |= 0xc0;
-        *csr_ptr = csr;
-
-        cmd_buf = 0x40000000;
-        err = !DBGEXIImm((u8*)&cmd_buf, 2, 1);
-
-        while (exi[0x34 / 4] & 1) ;
-
-        DBGEXIImm((u8*)&status, 4, 0);
-
-        while (exi[0x34 / 4] & 1) ;
-
-        csr = *csr_ptr;
-        csr &= 0x405;
-        *csr_ptr = csr;
-    } while (status & 2);
-
-    /* Send mail notification */
-    {
-        u32 mail;
-        u8 cnt = SendCount;
-        mail = ((u32)cnt << 16) | 0x1F000000 | (u32)len;
-        mail &= 0x1FFFFFFF;
-        mail |= 0xC0000000;
-
-        do {
-            u32 csr;
-            volatile u32* csr_ptr = (volatile u32*)0xCC006828;
-
-            csr = *csr_ptr;
-            csr &= 0x405;
-            csr |= 0xc0;
-            *csr_ptr = csr;
-
-            err = !DBGEXIImm((u8*)&mail, 4, 1);
-
-            while (exi[0x34 / 4] & 1) ;
-
-            csr = *csr_ptr;
-            csr &= 0x405;
-            *csr_ptr = csr;
-        } while (!err);
-
-        /* Wait for status ack */
-        do {
-            u32 csr;
-            volatile u32* csr_ptr = (volatile u32*)0xCC006828;
-
-            csr = *csr_ptr;
-            csr &= 0x405;
-            csr |= 0xc0;
-            *csr_ptr = csr;
-
-            cmd_buf = 0x40000000;
-            err = !DBGEXIImm((u8*)&cmd_buf, 2, 1);
-
-            while (exi[0x34 / 4] & 1) ;
-
-            DBGEXIImm((u8*)&status, 4, 0);
-
-            while (exi[0x34 / 4] & 1) ;
-
-            csr = *csr_ptr;
-            csr &= 0x405;
-            err = 0;
-            *csr_ptr = csr;
-        } while (err || (status & 2));
+    v = (SendCount << 0x10) | 0x1F000000 | size;
+    while (!DBGWriteMailbox(v)) {
     }
 
-    OSRestoreInterrupts(level);
+    do {
+        while (!DBGReadStatus(&busyFlag)) {
+        }
+    } while (busyFlag & 2);
+
+    OSRestoreInterrupts(interrupts);
     return 0;
 }
 
-void DBOpen(void) {
+void DBOpen(void)
+{
 }
 
-void DBClose(void) {
-}
-
-void EXI2_Init(void) {
-}
-
-void EXI2_EnableInterrupts(void) {
-}
-
-s32 EXI2_Poll(void) {
-    return 0;
-}
-
-s32 EXI2_ReadN(void) {
-    return 0;
-}
-
-s32 EXI2_WriteN(void) {
-    return 0;
-}
-
-void EXI2_Reserve(void) {
-}
-
-void EXI2_Unreserve(void) {
+void DBClose(void)
+{
 }

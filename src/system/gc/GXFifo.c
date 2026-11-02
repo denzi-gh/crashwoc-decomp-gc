@@ -151,22 +151,6 @@ void GXInitFifoLimits(GXFifoObj *fifo, u32 hiWatermark, u32 loWatermark)
     realFifo->loWatermark = loWatermark;
 }
 
-#if DEBUG  // currently doesn't match
-// HACK: Please match this function, so I can get rid of this mess!
-static char str_reg_field_out_of_range[] = "GX Internal: Register field out of range";
-#undef SET_REG_FIELD
-#define SET_REG_FIELD(line, reg, size, shift, val) \
-do { \
-    ASSERTMSGLINE(line, ((u32)(val) & ~((1 << (size)) - 1)) == 0, str_reg_field_out_of_range); \
-    (reg) = ((u32)(reg) & ~(((1 << (size)) - 1) << (shift))) | ((u32)(val) << (shift)); \
-} while (0)
-asm void GXSetCPUFifo(GXFifoObj *fifo)
-{
-    nofralloc
-#include "../../nonmatchings/GXSetCPUFifo.s"
-}
-#pragma peephole on
-#else
 void GXSetCPUFifo(GXFifoObj *fifo)
 {
     struct __GXFifoObj *realFifo = (struct __GXFifoObj *)fifo;
@@ -209,7 +193,6 @@ void GXSetCPUFifo(GXFifoObj *fifo)
 
     OSRestoreInterrupts(enabled);
 }
-#endif
 
 void GXSetGPFifo(GXFifoObj *fifo)
 {
@@ -542,18 +525,6 @@ do { \
     (reg) = ((u32)(reg) & ~(mask)) | ((u32)(val)); \
 } while (0)
 
-#if DEBUG  // currently doesn't match
-static char str_GXRedirectWriteGatherPipe_gxbegin[] = "'GXRedirectWriteGatherPipe' is not allowed between GXBegin/GXEnd";
-static char str_failed_assertion_offset[] = "Failed assertion OFFSET(ptr, 32) == 0";
-static char str_failed_assertion_pipenotredirected[] = "Failed assertion !IsWGPipeRedirected";
-static char str_failed_assertion_piperedirected[] = "Failed assertion IsWGPipeRedirected";
-asm volatile void *GXRedirectWriteGatherPipe(void *ptr)
-{
-    nofralloc
-#include "../../nonmatchings/GXRedirectWriteGatherPipe.s"
-}
-#pragma peephole on
-#else
 volatile void *GXRedirectWriteGatherPipe(void *ptr)
 {
     u32 reg = 0;
@@ -588,15 +559,7 @@ volatile void *GXRedirectWriteGatherPipe(void *ptr)
     OSRestoreInterrupts(enabled);
     return (volatile void *)GXFIFO_ADDR;
 }
-#endif
 
-#if DEBUG  // currently doesn't match
-asm void GXRestoreWriteGatherPipe(void)
-{
-    nofralloc
-#include "../../nonmatchings/GXRestoreWriteGatherPipe.s"
-}
-#else
 void GXRestoreWriteGatherPipe(void)
 {
     u32 reg = 0; // r31
@@ -632,4 +595,3 @@ void GXRestoreWriteGatherPipe(void)
     __sync();
     OSRestoreInterrupts(enabled);
 }
-#endif
