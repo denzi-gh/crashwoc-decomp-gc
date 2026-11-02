@@ -244,7 +244,7 @@ void __AXServiceVPB(AXVPB *pvpb) {
         *(dst) = *(src); dst+=1; src+=1;
         *(dst) = *(src); dst+=1; src+=1;
         *(dst) = *(src); dst+=1; src+=1;
-        *(dst) = *(src); 
+        *(dst) = *(src);
         if (pvpb->updateCounter) {
             u32 * src_;
             u32 * dst_;
@@ -313,7 +313,7 @@ void __AXServiceVPB(AXVPB *pvpb) {
         *(dst) = *(src); dst+=1; src+=1;
         *(dst) = *(src); dst+=1; src+=1;
         *(dst) = *(src); dst+=1; src+=1;
-        *(dst) = *(src); 
+        *(dst) = *(src);
     } else {
         ppbUser->addr.currentAddressHi = ppbDsp->addr.currentAddressHi;
         ppbUser->addr.currentAddressLo = ppbDsp->addr.currentAddressLo;
@@ -371,8 +371,8 @@ static inline void __AXDumpVPB(AXVPB * pvpb) {
     if (ppbDsp->state == 1) {
         __AXDepopVoice(ppbDsp);
     }
-    pvpb->pb.state = ppbDsp->state = ppbDsp->update.updNum[0] 
-        = ppbDsp->update.updNum[1] = ppbDsp->update.updNum[2] 
+    pvpb->pb.state = ppbDsp->state = ppbDsp->update.updNum[0]
+        = ppbDsp->update.updNum[1] = ppbDsp->update.updNum[2]
         = ppbDsp->update.updNum[3] = ppbDsp->update.updNum[4] = 0;
     __AXPushCallbackStack(pvpb);
 }
@@ -413,8 +413,8 @@ void __AXSyncPBs(u32 lessDspCycles) {
             __AXDepopVoice(&__AXPB[pvpb->index]);
         }
         pvpb->depop = 0;
-        __AXPB[pvpb->index].state = __AXPB[pvpb->index].update.updNum[0] = __AXPB[pvpb->index].update.updNum[1] 
-                                  = __AXPB[pvpb->index].update.updNum[2] = __AXPB[pvpb->index].update.updNum[3] 
+        __AXPB[pvpb->index].state = __AXPB[pvpb->index].update.updNum[0] = __AXPB[pvpb->index].update.updNum[1]
+                                  = __AXPB[pvpb->index].update.updNum[2] = __AXPB[pvpb->index].update.updNum[3]
                                   = __AXPB[pvpb->index].update.updNum[4] = 0;
     }
     DCFlushRange(__AXPB, sizeof(__AXPB));

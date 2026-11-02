@@ -139,52 +139,61 @@ void GXSetCopyClamp(GXFBClamp clamp)
     SET_REG_FIELD(0x485, gx->cpTex, 1, 1, clmpB);
 }
 
-static u32 GetNumXfbLines(u32 efbHeight, u32 iScale)
-{
+static u32 __GXGetNumXfbLines(u32 efbHt, u32 iScale) {
+    u32 count;
     u32 realHt;
+    u32 iScaleD;
 
-    realHt = ((efbHeight - 1) << 8) / iScale + 1;
-    if (iScale > 128 && iScale < 256) {
-        while ((iScale & 1) == 0) {
-            iScale >>= 1;
-        }
-        if ((efbHeight % iScale) == 0) {
+    count = (efbHt - 1) * 0x100;
+    realHt = (count / iScale) + 1;
+    iScaleD = iScale;
+
+    if (iScaleD > 128 && iScaleD < 256) {
+        for (; (iScaleD & 1) == 0; iScaleD >>= 1);
+
+        if ((efbHt % iScaleD) == 0) {
             realHt++;
         }
     }
+
     if (realHt > 1024) {
         realHt = 1024;
     }
+
     return realHt;
 }
 
-f32 GXGetYScaleFactor(u16 efbHeight, u16 xfbHeight)
-{
-    u32 iScale;
+f32 GXGetYScaleFactor(u16 efbHeight, u16 xfbHeight) {
     f32 fScale;
     f32 yScale;
+    u32 iScale;
+    u32 tgtHt;
     u32 realHt;
-    u32 tempHt;
 
-    tempHt = xfbHeight;
+    ASSERTMSGLINE(0x5B0, xfbHeight <= 1024, "GXGetYScaleFactor: Display copy only supports up to 1024 lines.\n");
+
+    ASSERTMSGLINE(0x5B2, efbHeight <= xfbHeight, "GXGetYScaleFactor: EFB height should not be greater than XFB height.\n");
+
+    tgtHt = xfbHeight;
     yScale = (f32)xfbHeight / (f32)efbHeight;
     iScale = (u32)(256.0f / yScale) & 0x1FF;
-    realHt = GetNumXfbLines(efbHeight, iScale);
-
+    realHt = __GXGetNumXfbLines(efbHeight, iScale);
     while (realHt > xfbHeight) {
-        tempHt--;
-        yScale = (f32)tempHt / (f32)efbHeight;
+        tgtHt--;
+        yScale = (f32)tgtHt / (f32)efbHeight;
         iScale = (u32)(256.0f / yScale) & 0x1FF;
-        realHt = GetNumXfbLines(efbHeight, iScale);
+        realHt = __GXGetNumXfbLines(efbHeight, iScale);
     }
     fScale = yScale;
+
     while (realHt < xfbHeight) {
-        tempHt++;
         fScale = yScale;
-        yScale = (f32)tempHt / (f32)efbHeight;
+        tgtHt++;
+        yScale = (f32)tgtHt / (f32)efbHeight;
         iScale = (u32)(256.0f / yScale) & 0x1FF;
-        realHt = GetNumXfbLines(efbHeight, iScale);
+        realHt = __GXGetNumXfbLines(efbHeight, iScale);
     }
+
     return fScale;
 }
 
@@ -192,6 +201,7 @@ u32 GXSetDispCopyYScale(f32 vscale)
 {
     u8 enable;
     u32 iScale;
+    u32 ht;
     u32 reg;
 
     CHECK_GXBEGIN(0x49B, "GXSetDispCopyYScale");
@@ -199,15 +209,16 @@ u32 GXSetDispCopyYScale(f32 vscale)
     ASSERTMSGLINE(0x49D, vscale >= 1.0f, "GXSetDispCopyYScale: Vertical scale must be >= 1.0");
 
     iScale = (u32) (256.0f / vscale) & 0x1FF;
+    enable = (iScale != 256);
 
     reg = 0;
     SET_REG_FIELD(0x4A6, reg, 9, 0, iScale);
     SET_REG_FIELD(0x4A7, reg, 8, 24, 0x4E);
     GX_WRITE_RAS_REG(reg);
-    gx->bpSentNot = 0;
-    enable = (iScale != 256);
+    gx->bpSentNot = GX_FALSE;
     SET_REG_FIELD(0x4AB, gx->cpDisp, 1, 10, enable);
-    return GetNumXfbLines(GET_REG_FIELD(gx->cpDispSize, 10, 10) + 1, iScale);
+    ht = (u32)GET_REG_FIELD(gx->cpDispSize, 10, 10) + 1;
+    return __GXGetNumXfbLines(ht, iScale);
 }
 
 void GXSetCopyClear(GXColor clear_clr, u32 clear_z)

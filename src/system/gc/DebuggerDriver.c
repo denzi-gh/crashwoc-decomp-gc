@@ -242,6 +242,8 @@ int DBQueryData(void)
         interrupts = OSDisableInterrupts();
         CheckMailBox();
     }
+    // Retail restores unconditionally (interrupts is uninitialized when
+    // RecvDataLeng != 0); moving the call inside the branch does not match.
     OSRestoreInterrupts(interrupts);
     return RecvDataLeng;
 }

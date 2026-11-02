@@ -189,7 +189,7 @@ void GXInitTexObj(GXTexObj *obj, void *image_ptr, u16 width, u16 height, GXTexFm
     if (mipmap != 0) {
         u8 lmax;
         t->flags |= 1;
-        if (format >= GX_TF_C4 && format <= GX_TF_C14X2) {
+        if (format == GX_TF_C4 || format == GX_TF_C8 || format == GX_TF_C14X2) {
             t->mode0 = (t->mode0 & 0xFFFFFF1F) | 0xA0;
         } else {
             t->mode0 = (t->mode0 & 0xFFFFFF1F) | 0xC0;

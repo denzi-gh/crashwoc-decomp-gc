@@ -1,211 +1,122 @@
-#include "string.h"
+#include "dolphin.h"
+#include "dolphin/card.h"
 
-struct DVDDiskID;
+#include "__card.h"
 
-typedef void (*CARDCallback)(long chan, long result);
-
-struct CARDDir {
-    unsigned char gameName[4];
-    unsigned char company[2];
-    unsigned char _padding0;
-    unsigned char bannerFormat;
-    unsigned char fileName[32];
-    unsigned long time;
-    unsigned long iconAddr;
-    unsigned short iconFormat;
-    unsigned short iconSpeed;
-    unsigned char permission;
-    unsigned char copyTimes;
-    unsigned short startBlock;
-    unsigned short length;
-    unsigned char _padding1[2];
-    unsigned long commentAddr;
-};
-
-struct CARDFileInfo {
-    long chan;
-    long fileNo;
-    long offset;
-    long length;
-    unsigned short iBlock;
-};
-
-struct CARDControl {
-    int attached;
-    long result;
-    unsigned short size;
-    char _pad0A[2];
-    long sectorSize;
-    unsigned short cBlock;
-    char _pad12[2];
-    long latency;
-    unsigned char id[12];
-    int mountStep;
-    unsigned long scramble;
-    char _pad2C[4];
-    char task[0x50];
-    void *workArea;
-    struct CARDDir *currentDir;
-    unsigned short *currentFat;
-    char threadQueue[8];
-    unsigned char cmd[9];
-    char _pad9D[3];
-    long cmdlen;
-    unsigned long mode;
-    int retry;
-    int repeat;
-    unsigned long addr;
-    void *buffer;
-    long xferred;
-    unsigned short freeNo;
-    unsigned short startBlock;
-    struct CARDFileInfo *fileInfo;
-    CARDCallback extCallback;
-    CARDCallback txCallback;
-    CARDCallback exiCallback;
-    CARDCallback apiCallback;
-    CARDCallback xferCallback;
-    CARDCallback eraseCallback;
-    CARDCallback unlockCallback;
-    char alarm[0x28];
-    unsigned long cid;
-    struct DVDDiskID *diskID;
-};
-
-extern struct CARDControl __CARDBlock[2];
-
-struct CARDDir *__CARDGetDirBlock(struct CARDControl *card);
-unsigned short *__CARDGetFatBlock(struct CARDControl *card);
-long __CARDGetControlBlock(long chan, struct CARDControl **pcard);
-long __CARDPutControlBlock(struct CARDControl *card, long result);
-long __CARDUpdateDir(long chan, CARDCallback callback);
-long __CARDAllocBlock(long chan, unsigned long cBlock, CARDCallback callback);
-int __CARDCompareFileName(struct CARDDir *ent, char *fileName);
-long __CARDSync(long chan);
-void __CARDDefaultApiCallback(long chan, long result);
-void __CARDSyncCallback(long chan, long result);
-long long OSGetTime(void);
+static void CreateCallbackFat(long chan, long result);
 
 static void CreateCallbackFat(long chan, long result) {
-    struct CARDControl *card;
-    CARDCallback callback;
+    struct CARDControl * card;
+    struct CARDDir * dir;
+    struct CARDDir * ent;
+    void (* callback)(long, long);
 
     card = &__CARDBlock[chan];
     callback = card->apiCallback;
-    card->apiCallback = 0;
+    card->apiCallback = NULL;
 
-    if (result < 0) goto error;
-
-    {
-        struct CARDDir *dir = __CARDGetDirBlock(card);
-        struct CARDDir *ent = &dir[card->freeNo];
-
-        memcpy(ent->gameName, card->diskID, 4);
-        memcpy(ent->company, (unsigned char *)card->diskID + 4, 2);
-
+    if (result >= 0) {
+        dir = __CARDGetDirBlock(card);
+        ent = &dir[card->freeNo];
+        memcpy(ent->gameName, card->diskID->gameName, sizeof(ent->gameName));
+        memcpy(ent->company,  card->diskID->company, sizeof(ent->company));
         ent->permission = 4;
         ent->copyTimes = 0;
-        ent->startBlock = card->startBlock;
+        ASSERTLINE(108, CARDIsValidBlockNo(card, card->startBlock));
+        ent->startBlock = (u16) card->startBlock;
         ent->bannerFormat = 0;
-        ent->iconAddr = 0xFFFFFFFF;
+        ent->iconAddr = -1;
         ent->iconFormat = 0;
         ent->iconSpeed = 0;
-        ent->commentAddr = 0xFFFFFFFF;
-        ent->iconSpeed = (ent->iconSpeed & ~3) | 1;
-
+        ent->commentAddr = -1;
+        ent->iconSpeed = (ent->iconSpeed & ~CARD_STAT_SPEED_MASK) | CARD_STAT_SPEED_FAST;
         card->fileInfo->offset = 0;
         card->fileInfo->iBlock = ent->startBlock;
-
-        ent->time = (unsigned long)(OSGetTime() / (*(unsigned long *)0x800000F8 / 4));
-
+        ent->time = OSTicksToSeconds(OSGetTime());
         result = __CARDUpdateDir(chan, callback);
-        if (result >= 0) return;
-    }
-
-error:
-    __CARDPutControlBlock(card, result);
-    if (callback) {
-        callback(chan, result);
+        if (result < 0) {
+            goto after;
+        }
+    } else {
+after:;
+        __CARDPutControlBlock(card, result);
+        if (callback) {
+            callback(chan, result);
+        }
     }
 }
 
-long CARDCreateAsync(long chan, char *fileName, unsigned long length,
-                     struct CARDFileInfo *fileInfo, CARDCallback callback) {
-    struct CARDControl *card;
-    struct CARDDir *dir;
-    struct CARDDir *ent;
-    unsigned short *fat;
-    long freeSlot;
-    long i;
+s32 CARDCreateAsync(s32 chan, const char* fileName, u32 size, CARDFileInfo* fileInfo,
+                                        CARDCallback callback) {
+    CARDControl* card;
+    CARDDir* dir;
+    CARDDir* ent;
+    u16 fileNo;
+    u16 freeNo;
+    u16* fat;
+    s32 result;
 
-    if (strlen(fileName) > 32) {
-        return -12;
+    ASSERTLINE(172, 0 <= chan && chan < 2);
+    ASSERTLINE(173, strlen(fileName) <= CARD_FILENAME_MAX);
+
+    if (strlen(fileName) > (u32)CARD_FILENAME_MAX) {
+        return CARD_RESULT_NAMETOOLONG;
     }
 
-    {
-        long r = __CARDGetControlBlock(chan, &card);
-        if (r < 0) {
-            return r;
-        }
+    result = __CARDGetControlBlock(chan, &card);
+    if (result < 0) {
+        return result;
     }
 
-    if (length == 0 || length % card->sectorSize != 0) {
-        return -128;
+    ASSERTLINE(185, 0 < size && (size % card->sectorSize) == 0);
+
+    if (size <= 0 || (size % card->sectorSize) != 0) {
+        return CARD_RESULT_FATAL_ERROR;
     }
 
-    freeSlot = 0xFFFF;
+    freeNo = (u16)-1;
     dir = __CARDGetDirBlock(card);
-    ent = dir;
-
-    for (i = 0; (unsigned short)i < 127; ent++, i++) {
-        if (ent->gameName[0] == 0xFF) {
-            if ((unsigned short)freeSlot == 0xFFFF) {
-                freeSlot = i;
+    for (fileNo = 0; fileNo < CARD_MAX_FILE; fileNo++) {
+        ent = &dir[fileNo];
+        if (ent->gameName[0] == 0xff) {
+            if (freeNo == (u16)-1) {
+                freeNo = fileNo;
             }
-        } else {
-            if (memcmp(ent, card->diskID, 4) == 0) {
-                if (memcmp(ent->company, (unsigned char *)card->diskID + 4, 2) == 0) {
-                    if (__CARDCompareFileName(ent, fileName)) {
-                        return __CARDPutControlBlock(card, -7);
-                    }
-                }
-            }
+        } else if (memcmp(ent->gameName, card->diskID->gameName, sizeof(ent->gameName)) == 0 &&
+                             memcmp(ent->company, card->diskID->company, sizeof(ent->company)) == 0 &&
+                             __CARDCompareFileName(ent, fileName)) {
+            return __CARDPutControlBlock(card, CARD_RESULT_EXIST);
         }
     }
-
-    if ((unsigned short)freeSlot == 0xFFFF) {
-        return __CARDPutControlBlock(card, -8);
+    if (freeNo == (u16)-1) {
+        return __CARDPutControlBlock(card, CARD_RESULT_NOENT);
     }
 
     fat = __CARDGetFatBlock(card);
-    if (card->sectorSize * fat[3] < length) {
-        return __CARDPutControlBlock(card, -9);
+    if (card->sectorSize * fat[CARD_FAT_FREEBLOCKS] < size) {
+        return __CARDPutControlBlock(card, CARD_RESULT_INSSPACE);
     }
 
     card->apiCallback = callback ? callback : __CARDDefaultApiCallback;
-
-    ent = &dir[(unsigned short)freeSlot];
-    card->freeNo = (unsigned short)freeSlot;
-    ent->length = (unsigned short)(length / card->sectorSize);
-    strncpy((char *)ent->fileName, fileName, 32);
+    card->freeNo = freeNo;
+    ent = &dir[freeNo];
+    ent->length = (u16)(size / card->sectorSize);
+    strncpy((char *)ent->fileName, fileName, CARD_FILENAME_MAX);
 
     card->fileInfo = fileInfo;
     fileInfo->chan = chan;
-    fileInfo->fileNo = (long)(unsigned short)freeSlot;
+    fileInfo->fileNo = freeNo;
 
-    {
-        long result = __CARDAllocBlock(chan, length / card->sectorSize, CreateCallbackFat);
-        if (result < 0) {
-            return __CARDPutControlBlock(card, result);
-        }
-        return result;
+    result = __CARDAllocBlock(chan, size / card->sectorSize, CreateCallbackFat);
+    if (result < 0) {
+        return __CARDPutControlBlock(card, result);
     }
+    return result;
 }
 
-long CARDCreate(long chan, char *fileName, unsigned long length,
-                struct CARDFileInfo *fileInfo) {
-    long result;
-    result = CARDCreateAsync(chan, fileName, length, fileInfo, __CARDSyncCallback);
+long CARDCreate(long chan, char * fileName, unsigned long size, struct CARDFileInfo * fileInfo) {
+    long result = CARDCreateAsync(chan, fileName, size, fileInfo, __CARDSyncCallback);
+
     if (result < 0) {
         return result;
     }

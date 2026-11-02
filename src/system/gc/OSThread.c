@@ -167,7 +167,7 @@ static int __OSIsThreadActive(struct OSThread * thread) {
     if (thread->state == 0) {
         return 0;
     }
-    
+
     for (active = __OSActiveThreadQueue.head; active; active = active->linkActive.next) {
         if (thread == active) {
             return 1;
@@ -201,13 +201,13 @@ s32 OSEnableScheduler(void) {
 static void SetRun(struct OSThread * thread) {
     ASSERTLINE(469, !IsSuspended(thread->suspend));
     ASSERTLINE(470, thread->state == OS_THREAD_STATE_READY);
-    
+
     ASSERTLINE(472, OS_PRIORITY_MIN <= thread->priority && thread->priority <= OS_PRIORITY_MAX);
 
     thread->queue = &RunQueue[thread->priority];
 
     ENQUEUE_THREAD(thread, thread->queue, link);
-    
+
     RunQueueBits |= 1 << (0x1F - thread->priority);
     RunQueueHint = 1;
 }
@@ -216,7 +216,7 @@ static void UnsetRun(struct OSThread * thread) {
     struct OSThreadQueue * queue;
 
     ASSERTLINE(0x1ED, thread->state == OS_THREAD_STATE_READY);
-    
+
     ASSERTLINE(0x1EF, OS_PRIORITY_MIN <= thread->priority && thread->priority <= OS_PRIORITY_MAX);
     ASSERTLINE(0x1F0, thread->queue == &RunQueue[thread->priority]);
 
@@ -233,7 +233,7 @@ static void UnsetRun(struct OSThread * thread) {
 long __OSGetEffectivePriority(struct OSThread * thread) {
     long priority = thread->base;
     struct OSMutex * mutex;
-    
+
     for(mutex = thread->queueMutex.head; mutex; mutex = mutex->link.next) {
         struct OSThread * blocked = mutex->queue.head;
         if (blocked && blocked->priority < priority) {
@@ -364,7 +364,7 @@ void __OSReschedule(void) {
 void OSCancelThread(struct OSThread * thread) {
     int enabled = OSDisableInterrupts();
 
-    ASSERTMSG1LINE(0x37E, __OSIsThreadActive(thread) != 0, 
+    ASSERTMSG1LINE(0x37E, __OSIsThreadActive(thread) != 0,
         "OSExitThread(): thread %p is not active.", thread);
 
     switch(thread->state) {
@@ -454,7 +454,7 @@ long OSSuspendThread(struct OSThread * thread) {
                 thread->priority = 0x20;
                 ENQUEUE_THREAD(thread, thread->queue, link);
                 if (thread->mutex) {
-                    ASSERTLINE(0x463, thread->mutex->thread); 
+                    ASSERTLINE(0x463, thread->mutex->thread);
                     UpdatePriority(thread->mutex->thread);
                 }
                 break;

@@ -684,7 +684,6 @@ config.libs = [
         Object(NonMatching, "GXFrameBuf.c", source="system/gc/GXFrameBuf.c"),
         Object(NonMatching, "GXTexture.c", source="system/gc/GXTexture.c"),
         Object(NonMatching, "GXInit.c", source="system/gc/GXInit.c"),
-        Object(NonMatching, "DebuggerDriver.c", source="system/gc/DebuggerDriver.c"),
         Object(NonMatching, "mtx44.c", source="system/gc/mtx44.c"),
         Object(NonMatching, "mtx.c", source="system/gc/mtx.c"),
         Object(NonMatching, "vec.c", source="system/gc/vec.c"),
@@ -734,13 +733,16 @@ config.libs = [
         Object(NonMatching, "db.c", source="system/gc/db.c"),
         Object(NonMatching, "PPCArch.c", source="system/gc/PPCArch.c"),
     ]),
+    # DebuggerDriver (OdemuExi2) is the one SDK unit whose retail object was
+    # built with a different mwcc than the rest of the SDK; same flags, own
+    # compiler version. Everything else stays in the DolphinLib block above.
     {
-        "lib": "CrashWOC_SDK",
-        "mw_version": config.linker_version,
-        "cflags": cflags_base,
+        "lib": "CrashWOC_SDK_MW",
+        "mw_version": "GC/1.2.5",
+        "cflags": cflags_mw_sdk,
         "progress_category": "sdk",
         "objects": [
-            # CARDCreate.c moved to CrashWOC_SDK_MW (Metrowerks-compiled SDK)
+            Object(NonMatching, "DebuggerDriver.c", source="system/gc/DebuggerDriver.c"),
         ],
     },
     {

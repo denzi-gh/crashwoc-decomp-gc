@@ -35,7 +35,6 @@ int OSGetResetButtonState() {
     int state;
     long long now;
     long long fire;
-    int minutes;
 
     enabled = OSDisableInterrupts();
     now = __OSGetSystemTime();
@@ -66,11 +65,13 @@ int OSGetResetButtonState() {
     }
     LastState = state;
 
-    minutes = *(u8*)OSPhysicalToCached(0x30E3) & 0x3F;
-    if (minutes) {
-        fire = __OSStartTime + OSSecondsToTicks((long long)(minutes * 60));
+    if (__gUnknown800030E3 & 0x3F) {
+        fire = (__gUnknown800030E3 & 0x3F) * 60;
+        fire = __OSStartTime + OSSecondsToTicks(fire);
         if (fire < now) {
-            if ((((now - fire) / OS_TIMER_CLOCK / 2) & 1) == 0) {
+            now -= fire;
+            now = OSTicksToSeconds(now) / 2;
+            if ((now & 1) == 0) {
                 state = 1;
             } else {
                 state = 0;

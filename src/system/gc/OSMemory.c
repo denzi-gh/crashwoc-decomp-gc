@@ -118,6 +118,7 @@ static asm void RealMode(register u32 addr) {
 }
 
 void __OSInitMemoryProtection(void) {
+    u8 padding[48];
     BOOL enabled;
     u32 simulatedSize;
 
@@ -143,7 +144,8 @@ void __OSInitMemoryProtection(void) {
 
     OSRegisterResetFunction(&ResetFunctionInfo);
 
-    if (__OSSimulatedMemSize < __OSPhysicalMemSize && __OSSimulatedMemSize == 0x1800000) {
+    simulatedSize = __OSSimulatedMemSize;
+    if (simulatedSize < __OSPhysicalMemSize && simulatedSize == 0x1800000) {
         __MEMRegs[20] = 2;
     }
 

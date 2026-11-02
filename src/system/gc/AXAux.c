@@ -54,6 +54,7 @@ void __AXGetAuxAOutput(u32 * p) {
 }
 
 void __AXGetAuxBInput(u32 * p) {
+    // Retail tests the AuxA callback here, not AuxB (reproduced as shipped).
     if (__AXCallbackAuxA) {
         *p = (u32)&__AXBufferAuxB[__AXAuxDspWritePosition][0];
     } else {

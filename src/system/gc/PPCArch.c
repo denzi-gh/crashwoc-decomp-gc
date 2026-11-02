@@ -4,7 +4,7 @@
 asm u32 PPCMfmsr() {
     nofralloc
     mfmsr r3
-    blr    
+    blr
 }
 
 asm void PPCMtmsr(register u32 newMSR) {

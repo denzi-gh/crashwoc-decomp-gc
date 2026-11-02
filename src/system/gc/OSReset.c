@@ -134,6 +134,7 @@ void OSResetSystem(int reset, unsigned long resetCode, int forceMenu) {
     int rc;
     int disableRecalibration;
     struct OSSram * sram;
+    u8 padding[8];
 
     OSDisableScheduler();
     __OSStopAudioSystem();

@@ -174,7 +174,7 @@ static void L2Init(void) {
   PPCMtmsr(oldMSR);
 }
 
-static void L2Enable(void) { 
+static void L2Enable(void) {
     PPCMtl2cr((PPCMfl2cr() | L2CR_L2E) & ~L2CR_L2I);
 }
 

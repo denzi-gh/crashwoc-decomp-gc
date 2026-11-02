@@ -148,10 +148,10 @@ void * OSAllocFromHeap(int heap, unsigned long size) {
         newCell->prev = cell->prev;
         newCell->next = cell->next;
         if (newCell->next != NULL) {
-            newCell->next->prev = newCell; 
+            newCell->next->prev = newCell;
         }
         if (newCell->prev != NULL) {
-            newCell->prev->next = newCell; 
+            newCell->prev->next = newCell;
         } else {
             ASSERTMSGLINE(0x186, hd->free == cell, "OSAllocFromHeap(): heap is broken.");
             hd->free = newCell;
@@ -280,7 +280,7 @@ int OSCreateHeap(void * start, void * end) {
     return -1;
 }
 
- 
+
 
 // custom macro for OSCheckHeap
 #define ASSERTREPORT(line, cond) \
@@ -296,7 +296,7 @@ long OSCheckHeap(int heap) {
     ASSERTREPORT(0x37E, 0 <= heap && heap < NumHeaps);
     hd = &HeapArray[heap];
     ASSERTREPORT(0x381, 0 <= hd->size);
-    
+
     ASSERTREPORT(0x383, hd->allocated == NULL || hd->allocated->prev == NULL);
 
     for(cell = hd->allocated; cell; cell = cell->next) {
@@ -313,9 +313,9 @@ long OSCheckHeap(int heap) {
 #endif
     }
 
-    
-    ASSERTREPORT(0x395, hd->free == NULL || hd->free->prev == NULL); 
-    
+
+    ASSERTREPORT(0x395, hd->free == NULL || hd->free->prev == NULL);
+
     for(cell = hd->free; cell; cell = cell->next) {
         ASSERTREPORT(0x398, InRange(cell, ArenaStart, ArenaEnd));
         ASSERTREPORT(0x399, OFFSET(cell, ALIGNMENT) == 0);

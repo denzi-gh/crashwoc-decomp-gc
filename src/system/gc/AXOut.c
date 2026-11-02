@@ -16,7 +16,7 @@ volatile static long long __AXOsTime;
 static void (* __AXUserFrameCallback)();
 volatile static int __AXDSPInitFlag;
 static int __AXDSPDoneFlag;
-static u32 __AXDebugSteppingMode;
+static volatile u32 __AXDebugSteppingMode;
 
 // functions
 static void __AXDSPInitCallback(void *task);

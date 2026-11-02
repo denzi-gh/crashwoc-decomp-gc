@@ -186,16 +186,22 @@ GXFifoObj *GXInit(void *base, u32 size)
     for (i = 0; i < 4; i++)
         GXInitTlutRegion(&gx->TlutRegions[i + 16], 0xE0000 + i * 0x8000, 64);
 
-    __cpReg[3] = 0;
-    SET_REG_FIELD(0, gx->perfSel, 4, 4, 0);
-    GX_WRITE_SOME_REG4(8, 0x20, gx->perfSel, 0x20 - 0x20);
-    GX_WRITE_XF_REG(6, 0);
-    reg = 0x23000000;
-    GX_WRITE_RAS_REG(reg);
-    reg = 0x24000000;
-    GX_WRITE_RAS_REG(reg);
-    reg = 0x67000000;
-    GX_WRITE_RAS_REG(reg);
+    {
+        u32 reg = 0;
+
+        __cpReg[3] = reg;
+        SET_REG_FIELD(0, gx->perfSel, 4, 4, 0);
+        GX_WRITE_SOME_REG4(8, 32, gx->perfSel, -12);
+
+        reg = 0;
+        GX_WRITE_XF_REG(6, reg);
+        reg = 0x23000000;
+        GX_WRITE_RAS_REG(reg);
+        reg = 0x24000000;
+        GX_WRITE_RAS_REG(reg);
+        reg = 0x67000000;
+        GX_WRITE_RAS_REG(reg);
+    }
     __GXSetTmemConfig(0);
     __GXInitGX();
 
@@ -214,8 +220,8 @@ void __GXInitGX(void)
     switch (VIGetTvFormat()) {
     case VI_NTSC:    rmode = &GXNtsc480IntDf;      break;
     case VI_PAL:     rmode = &GXPal528IntDf;       break;
-    case VI_MPAL:    rmode = &GXMpal480IntDf;      break;
     case VI_EURGB60: rmode = &GXEurgb60Hz480IntDf; break;
+    case VI_MPAL:    rmode = &GXMpal480IntDf;      break;
     default:
         ASSERTMSGLINE(0x38B, 0, "GXInit: invalid TV format");
         rmode = &GXNtsc480IntDf;
