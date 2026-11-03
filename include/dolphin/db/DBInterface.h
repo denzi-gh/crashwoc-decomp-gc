@@ -18,7 +18,15 @@ typedef struct DBInterface
 extern DBInterface* __DBInterface;
 
 void DBInit(void);
-void DBInitComm(int* inputFlagPtr, int* mtrCallback);
+typedef void (*MTRCallbackType)(int);
+
+void DBInitComm(u8** inputFlagPtr, MTRCallbackType mtrCallback);
+void DBInitInterrupts(void);
+int DBQueryData(void);
+BOOL DBRead(void* buffer, int count);
+BOOL DBWrite(const void* src, int size);
+void DBOpen(void);
+void DBClose(void);
 void __DBExceptionDestination(void);
 void __DBExceptionDestinationAux(void);
 BOOL __DBIsExceptionMarked(__OSException exception);

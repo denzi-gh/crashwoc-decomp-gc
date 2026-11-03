@@ -395,7 +395,7 @@ void GXSetViewportJitter(f32 left, f32 top, f32 wd, f32 ht, f32 nearz, f32 farz,
     f32 oz;
     f32 zmin;
     f32 zmax;
-    u32 reg;
+    f32 hy;
 
     CHECK_GXBEGIN(0x340, "GXSetViewport");  // not the correct function name
 
@@ -405,7 +405,8 @@ void GXSetViewportJitter(f32 left, f32 top, f32 wd, f32 ht, f32 nearz, f32 farz,
     sx = wd / 2.0f;
     sy = -ht / 2.0f;
     ox = 342.0f + (left + (wd / 2.0f));
-    oy = 342.0f + (top + (ht / 2.0f));
+    hy = ht / 2.0f;
+    oy = 342.0f + (top + hy);
     zmin = 1.6777215e7f * nearz;
     zmax = 1.6777215e7f * farz;
     sz = zmax - zmin;
@@ -419,9 +420,8 @@ void GXSetViewportJitter(f32 left, f32 top, f32 wd, f32 ht, f32 nearz, f32 farz,
     if (gx->fgRange != 0) {
         __GXSetRange(nearz, gx->fgSideX);
     }
-    reg = 0x5101A;
     GX_WRITE_U8(0x10);
-    GX_WRITE_U32(reg);
+    GX_WRITE_U32(0x5101A);
     GX_WRITE_XF_REG_F(26, sx);
     GX_WRITE_XF_REG_F(27, sy);
     GX_WRITE_XF_REG_F(28, sz);

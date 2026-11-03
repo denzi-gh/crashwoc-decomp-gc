@@ -730,59 +730,68 @@ DOCUME_1_bill_LOCALS_1_Temp_libgcc2161972283492.s:
 	.data5      start:0x803D53D8 end:0x803D54D8
 
 DOCUME_1_bill_LOCALS_1_Temp_libgcc2161972283492.s_1:
-	.text       start:0x800DC908 end:0x800DCE6C
+	.text       start:0x800DC908 end:0x800DCDD0
 	.data5      start:0x803D54D8 end:0x803D55F8
 
+PPCArch.c:
+	.text       start:0x800DCDD0 end:0x800DCE44
+
 OS.c:
-	.text       start:0x800DCE6C end:0x800DDD38
+	.text       start:0x800DCE44 end:0x800DD6DC
 	.data       start:0x80165B40 end:0x80165D00
 	.sbss       start:0x803D3ED8 end:0x803D3F08
 
 OSAlarm.c:
-	.text       start:0x800DDD38 end:0x800DDD84
+	.text       start:0x800DD6DC end:0x800DDD84
 	.data       start:0x80165D00 end:0x80165EE8
 	.sbss       start:0x803D3F08 end:0x803D3F10
 
 OSAlloc.c:
-	.text       start:0x800DDD84 end:0x800DEB00
+	.text       start:0x800DDD84 end:0x800DE400
 	.data       start:0x80165EE8 end:0x80166280
 	.sbss       start:0x803D3F10 end:0x803D3F20
 
 OSArena.c:
+	.text       start:0x800DE400 end:0x800DE420
 	.sdata      start:0x803D38B8 end:0x803D38C0
 	.sbss       start:0x803D3F20 end:0x803D3F28
 
 OSAudioSystem.c:
+	.text       start:0x800DE420 end:0x800DE6B4
 	.data       start:0x80166280 end:0x80166300
 
 OSCache.c:
+	.text       start:0x800DE6B4 end:0x800DEB00
 	.data       start:0x80166300 end:0x80166530
 
 OSContext.c:
-	.text       start:0x800DEB00 end:0x800DFEA0
+	.text       start:0x800DEB00 end:0x800DF2BC
 	.data       start:0x80166530 end:0x80166708
 
 OSError.c:
+	.text       start:0x800DF2BC end:0x800DF684
 	.data       start:0x80166708 end:0x80166A28
 	.sdata      start:0x803D38C0 end:0x803D38C8
 
 OSInterrupt.c:
-	.text       start:0x800DFEA0 end:0x800DFF04
+	.text       start:0x800DF684 end:0x800DFEEC
 	.data       start:0x80166A28 end:0x80166A58
 	.sbss       start:0x803D3F28 end:0x803D3F40
 
 OSLink.c:
+	.text       start:0x800DFEEC end:0x800DFF04
 	.data       start:0x80166A58 end:0x80166AA8
 
 OSMemory.c:
-	.text       start:0x800DFF04 end:0x800E0268
+	.text       start:0x800DFF04 end:0x800E01E4
 	.data       start:0x80166AA8 end:0x80166AB8
 
 OSReset.c:
-	.text       start:0x800E0268 end:0x800E0944
+	.text       start:0x800E01E4 end:0x800E05B8
 	.sbss       start:0x803D3F40 end:0x803D3F48
 
 OSResetSW.c:
+	.text       start:0x800E05B8 end:0x800E0944
 	.sbss       start:0x803D3F48 end:0x803D3F68
 
 OSRtc.c:
@@ -790,52 +799,59 @@ OSRtc.c:
 	.bss        start:0x80218F40 end:0x80218F98
 
 OSSync.c:
-	.text       start:0x800E1138 end:0x800E1380
+	.text       start:0x800E1138 end:0x800E11BC
 
 OSThread.c:
-	.text       start:0x800E1380 end:0x800E203C
+	.text       start:0x800E11BC end:0x800E1FB8
 	.data       start:0x80166AB8 end:0x801672C8
 	.bss        start:0x80218F98 end:0x80219980
 	.sdata      start:0x803D38C8 end:0x803D38D8
 	.sbss       start:0x803D3F68 end:0x803D3F78
 
+OSTime.c:
+	.text       start:0x800E1FB8 end:0x800E23DC
+	.data       start:0x801672C8 end:0x80167328
+
+OSMutex.c:
+	.text       start:0x800E23DC end:0x800E244C
+
+OSReboot.c:
+	.text       start:0x800E244C end:0x800E2664
+	.bss        start:0x80219980 end:0x8021A9A0
+	.sbss       start:0x803D3F78 end:0x803D3F90
+
+db.c:
+	.text       start:0x800E2664 end:0x800E2750
+	.data       start:0x80167328 end:0x80167340
+
 mtx.c:
+	.text       start:0x800E2750 end:0x800E28EC
 	.sdata      start:0x803D38D8 end:0x803D38E0
 	.data5      start:0x803D55F8 end:0x803D5638
 
-OSTime.c:
-	.text       start:0x800E203C end:0x800E244C
-	.data       start:0x801672C8 end:0x80167328
-
-db.c:
-	.data       start:0x80167328 end:0x80167340
-
 mtx44.c:
+	.text       start:0x800E28EC end:0x800E2A54
 	.data       start:0x80167340 end:0x80167350
 	.data5      start:0x803D5638 end:0x803D5670
 
 vec.c:
 	.data5      start:0x803D5670 end:0x803D56B8
 
-OSReboot.c:
-	.text       start:0x800E244C end:0x800E2E6C
-	.bss        start:0x80219980 end:0x8021A9A0
-	.sbss       start:0x803D3F78 end:0x803D3F90
-
 dvdfs.c:
-	.text       start:0x800E2E6C end:0x800E34D4
+	.text       start:0x800E2A54 end:0x800E33D8
 	.data       start:0x80167350 end:0x80167740
 	.sdata      start:0x803D38E0 end:0x803D38E8
 	.sbss       start:0x803D3F90 end:0x803D3FB0
 
 dvd.c:
-	.text       start:0x800E34D4 end:0x800E5D38
+	.text       start:0x800E33D8 end:0x800E5B40
 	.data       start:0x80167740 end:0x80167858
 	.bss        start:0x8021A9A0 end:0x8021AA78
 	.sdata      start:0x803D38E8 end:0x803D38F0
 	.sbss       start:0x803D3FB0 end:0x803D4008
 
 dvdqueue.c:
+	.text       start:0x800E5B40 end:0x800E5D38
 	.data       start:0x80167858 end:0x801679C0
 	.bss        start:0x8021AA78 end:0x8021AA98
 	.sdata      start:0x803D38F0 end:0x803D3928
@@ -845,110 +861,128 @@ dvderror.c:
 	.data       start:0x801679C0 end:0x80167A08
 
 fstload.c:
-	.text       start:0x800E5ED0 end:0x800E6538
+	.text       start:0x800E5ED0 end:0x800E6110
 	.data       start:0x80167A08 end:0x80167A78
 	.bss        start:0x8021AA98 end:0x8021AB08
 	.sdata      start:0x803D3928 end:0x803D3938
 	.sbss       start:0x803D4008 end:0x803D4018
 
 dvdlow.c:
-	.text       start:0x800E6538 end:0x800E8738
+	.text       start:0x800E6110 end:0x800E6F64
 	.bss        start:0x8021AB08 end:0x8021ABD8
 	.sdata      start:0x803D3938 end:0x803D3940
 	.sbss       start:0x803D4018 end:0x803D4060
 
 vi.c:
-	.text       start:0x800E8738 end:0x800E895C
+	.text       start:0x800E6F64 end:0x800E895C
 	.data       start:0x80167A78 end:0x80167D40
 	.bss        start:0x8021ABD8 end:0x8021AD20
 	.sbss       start:0x803D4060 end:0x803D40B0
 
 Padclamp.c:
-	.text       start:0x800E895C end:0x800E9EB0
+	.text       start:0x800E895C end:0x800E8B94
 	.sdata      start:0x803D3940 end:0x803D3948
 
 Pad.c:
-	.text       start:0x800E9EB0 end:0x800EAC98
+	.text       start:0x800E8B94 end:0x800EA56C
 	.data       start:0x80167D40 end:0x80167D50
 	.bss        start:0x8021AD20 end:0x8021ADA0
 	.sdata      start:0x803D3948 end:0x803D3980
 	.sbss       start:0x803D40B0 end:0x803D40E0
 
 ai.c_1:
-	.text       start:0x800EAC98 end:0x800EB0D4
+	.text       start:0x800EA56C end:0x800EAE7C
 	.sbss       start:0x803D40E0 end:0x803D4130
 
 ar.c:
-	.text       start:0x800EB0D4 end:0x800ECBB4
+	.text       start:0x800EAE7C end:0x800EBA60
 	.sbss       start:0x803D4130 end:0x803D4150
 
 arq.c:
+	.text       start:0x800EBA60 end:0x800EBDF4
 	.sbss       start:0x803D4150 end:0x803D4180
 
+AX.c:
+	.text       start:0x800EBDF4 end:0x800EBE28
+
 AXAlloc.c:
+	.text       start:0x800EBE28 end:0x800EC248
 	.bss        start:0x8021ADA0 end:0x8021AEA0
 	.sbss       start:0x803D4180 end:0x803D4188
 
 AXAux.c:
+	.text       start:0x800EC248 end:0x800EC554
 	.bss        start:0x8021AEA0 end:0x8021DBA0
 	.sbss       start:0x803D4188 end:0x803D41B8
 
 AXCL.c:
+	.text       start:0x800EC554 end:0x800EC9C4
 	.bss        start:0x8021DBA0 end:0x8021E1A0
 	.sbss       start:0x803D41B8 end:0x803D41C8
 
 AXOut.c:
-	.text       start:0x800ECBB4 end:0x800EFE70
+	.text       start:0x800EC9C4 end:0x800ED030
 	.bss        start:0x8021E1A0 end:0x802229C0
 	.sbss       start:0x803D41C8 end:0x803D41E8
 
 AXSPB.c:
+	.text       start:0x800ED030 end:0x800ED460
 	.bss        start:0x802229C0 end:0x80222A00
 	.sbss       start:0x803D41E8 end:0x803D4210
 
 AXVPB.c:
+	.text       start:0x800ED460 end:0x800EE0C4
 	.data       start:0x80167D50 end:0x801697E0
 	.bss        start:0x80222A00 end:0x80232800
 	.sbss       start:0x803D4210 end:0x803D4220
 	.data5      start:0x803D56B8 end:0x803D56C0
 
 AXProf.c:
+	.text       start:0x800EE0C4 end:0x800EE10C
 	.sbss       start:0x803D4220 end:0x803D4230
 
 dsp.c:
+	.text       start:0x800EE10C end:0x800EE350
 	.data       start:0x801697E0 end:0x80169818
 	.sbss       start:0x803D4230 end:0x803D4238
 
+dsp_debug.c:
+	.text       start:0x800EE350 end:0x800EE3A0
+
 dsp_task.c:
+	.text       start:0x800EE3A0 end:0x800EEC24
 	.data       start:0x80169818 end:0x80169958
 	.sbss       start:0x803D4238 end:0x803D4270
 
 CARDBios.c:
-	.text       start:0x800EFE70 end:0x800EFEC8
+	.text       start:0x800EEC24 end:0x800EFEC0
 	.data       start:0x80169958 end:0x80169968
 	.bss        start:0x80232800 end:0x80232A40
 
 CARDBlock.c:
-	.text       start:0x800EFEC8 end:0x800F02CC
+	.text       start:0x800EFEC0 end:0x800F02C4
 
 CARDDir.c:
-	.text       start:0x800F02CC end:0x800F06D8
+	.text       start:0x800F02C4 end:0x800F0528
 
 CARDCheck.c:
-	.text       start:0x800F06D8 end:0x800F162C
+	.text       start:0x800F0528 end:0x800F1490
 
 CARDMount.c:
-	.text       start:0x800F162C end:0x800F1F08
+	.text       start:0x800F1490 end:0x800F1F08
 	.data       start:0x80169968 end:0x801699C0
 
 CARDFormat.c:
-	.text       start:0x800F1F08 end:0x800F2B4C
+	.text       start:0x800F1F08 end:0x800F26F8
+
+CARDOpen.c:
+	.text       start:0x800F26F8 end:0x800F2B4C
 
 CARDCreate.c:
-	.text       start:0x800F2B4C end:0x800F309C
+	.text       start:0x800F2B4C end:0x800F2EE4
 
 CARDRead.c:
-	.text       start:0x800F309C end:0x800F335C
+	.text       start:0x800F2EE4 end:0x800F335C
 
 CARDWrite.c:
 	.text       start:0x800F335C end:0x800F36D8
@@ -967,89 +1001,110 @@ CARDRdwr.c:
 	.text       start:0x800F4FC8 end:0x800F5248
 
 GXInit.c:
-	.text       start:0x800F5248 end:0x800F6930
+	.text       start:0x800F5248 end:0x800F6334
 	.bss        start:0x80232A40 end:0x80232FC8
 	.data5      start:0x803D56C0 end:0x803D56E0
 
-GXFrameBuf.c:
-	.data5      start:0x803D56E0 end:0x803D5710
-
 GXFifo.c:
-	.text       start:0x800F6930 end:0x800F6AD4
+	.text       start:0x800F6334 end:0x800F6AD4
 	.sbss       start:0x803D4270 end:0x803D4290
 
 GXAttr.c:
-	.text       start:0x800F6AD4 end:0x800F87B8
+	.text       start:0x800F6AD4 end:0x800F83E8
 	.data       start:0x80169B20 end:0x80169D98
 	.sdata      start:0x803D3980 end:0x803D39D8
 
 GXMisc.c:
-	.text       start:0x800F87B8 end:0x800FA2E8
+	.text       start:0x800F83E8 end:0x800F8944
 	.data       start:0x80169D98 end:0x8016A538
 	.sbss       start:0x803D4290 end:0x803D42B0
 
+GXGeometry.c:
+	.text       start:0x800F8944 end:0x800F8CFC
+
+GXFrameBuf.c:
+	.text       start:0x800F8CFC end:0x800F9AE8
+	.data5      start:0x803D56E0 end:0x803D5710
+
 GXLight.c:
+	.text       start:0x800F9AE8 end:0x800FA2E8
 	.data       start:0x8016A538 end:0x8016A558
 	.data5      start:0x803D5710 end:0x803D5760
 
 GXTexture.c:
-	.text       start:0x800FA2E8 end:0x800FC6D0
+	.text       start:0x800FA2E8 end:0x800FB204
 	.data       start:0x8016A558 end:0x8016A870
 	.data5      start:0x803D5760 end:0x803D5798
 
 GXBump.c:
+	.text       start:0x800FB204 end:0x800FB5D8
 	.data5      start:0x803D5798 end:0x803D57D0
 
 GXTev.c:
+	.text       start:0x800FB5D8 end:0x800FBEB4
 	.data       start:0x8016A870 end:0x8016A898
 
 GXPixel.c:
+	.text       start:0x800FBEB4 end:0x800FC5FC
 	.data       start:0x8016A898 end:0x8016A914
 	.data5      start:0x803D57D0 end:0x803D5828
 
-GXPerf.c:
-	.data       start:0x8016A914 end:0x8016AA00
-
 GXTransform.c:
-	.text       start:0x800FC6D0 end:0x800FD5D4
+	.text       start:0x800FC5FC end:0x800FCB78
 	.data5      start:0x803D5828 end:0x803D5848
 
+GXPerf.c:
+	.text       start:0x800FCB78 end:0x800FD5C0
+	.data       start:0x8016A914 end:0x8016AA00
+
+GXStubs.c:
+	.text       start:0x800FD5C0 end:0x800FD5C4
+
 texPalette.c:
+	.text       start:0x800FD5C4 end:0x800FD5D4
 	.data       start:0x8016AA00 end:0x8016AA40
 	.data5      start:0x803D5848 end:0x803D5850
 
 DebuggerDriver.c:
-	.text       start:0x800FD5D4 end:0x800FE07C
+	.text       start:0x800FD5D4 end:0x800FE054
 	.sdata      start:0x803D39D8 end:0x803D39E0
 	.sbss       start:0x803D42B0 end:0x803D42C8
 
-EXIUart.c:
-	.sbss       start:0x803D42C8 end:0x803D42D8
+AmcExi2Stubs.c:
+	.text       start:0x800FE054 end:0x800FE07C
 
 EXIBios.c:
-	.text       start:0x800FE07C end:0x800FFBE4
+	.text       start:0x800FE07C end:0x800FF918
 	.data       start:0x8016AA40 end:0x8016AAB8
 	.bss        start:0x80232FC8 end:0x80233088
 	.sdata      start:0x803D39E0 end:0x803D3A18
 
+EXIUart.c:
+	.text       start:0x800FF918 end:0x800FFB88
+	.sbss       start:0x803D42C8 end:0x803D42D8
+
 SIBios.c:
-	.text       start:0x800FFBE4 end:0x801017C0
+	.text       start:0x800FFB88 end:0x801013D8
 	.data       start:0x8016AAB8 end:0x8016AB88
 	.bss        start:0x80233088 end:0x802332A0
 	.sdata      start:0x803D3A18 end:0x803D3BD0
 	.sbss       start:0x803D42D8 end:0x803D42E8
 
 SISamplingRate.c:
+	.text       start:0x801013D8 end:0x801014E0
 	.data       start:0x8016AB88 end:0x8016AC20
 	.sbss       start:0x803D42E8 end:0x803D42F8
 
 GBA.c:
-	.text       start:0x801017C0 end:0x80101A80
+	.text       start:0x801014E0 end:0x801017D0
 	.data       start:0x8016AC20 end:0x8016AC30
 	.bss        start:0x802332A0 end:0x803D225C
 
+GBAGetProcessStatus.c:
+	.text       start:0x801017D0 end:0x80101944
+
 GBAJoyBoot.c:
-	.text       start:0x80101A80 end:0x80102808
+	.text       start:0x80101944 end:0x80102808
 	.data       start:0x8016AC30 end:0x8016AC60
 
 GBARead.c:

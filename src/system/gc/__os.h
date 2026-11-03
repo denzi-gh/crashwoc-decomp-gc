@@ -5,6 +5,8 @@
 
 // OS.c
 extern char * __OSExceptionNames[15]; // D ONLY
+extern OSTime __OSStartTime;
+extern int __OSInIPL;
 
 unsigned long __OSIsDebuggerPresent(void);
 void __OSPSInit(void);
@@ -24,6 +26,7 @@ void __OSCacheInit(void);
 void __OSContextInit(void);
 
 // OSError.c
+extern OSErrorHandler __OSErrorTable[16];
 void __OSUnhandledException(unsigned char exception, struct OSContext * context, unsigned long dsisr, unsigned long dar);
 
 // OSInterrupt.c
@@ -46,6 +49,12 @@ void __OSModuleInit(void);
 void __OSUnlockAllMutex(struct OSThread *thread);
 int __OSCheckDeadLock(struct OSThread *thread);
 int __OSCheckMutexes(struct OSThread *thread);
+
+// OSReboot.c
+void __OSReboot(u32 resetCode, u32 bootDol);
+
+// OSReset.c
+void __OSDoHotReset(u32 resetCode);
 
 // OSResetSW.c
 void __OSResetSWInterruptHandler(short exception, struct OSContext *context);

@@ -687,10 +687,11 @@ struct visidata_s {
     int curknot;
 };
 
+// Retail GC dropped the alpha's unpackdata[2]: GenDebIndex* address debris at
+// base+0x8, so only dmadata[2] precedes it (alpha DWARF offsets kept for reference).
 struct rdata_s
 {
     int dmadata[2]; // Offset: 0x0, DWARF: 0xBCB9C8
-    int unpackdata[2]; // Offset: 0x8, DWARF: 0xBCB9F4
     // Size: 0x20
     struct
     {
@@ -702,7 +703,7 @@ struct rdata_s
         float my; // Offset: 0x14, DWARF: 0xBC8C7F
         float mz; // Offset: 0x18, DWARF: 0xBC8CA4
         float etime; // Offset: 0x1C, DWARF: 0xBC8CC9
-    } debris[32]; // Offset: 0x10, DWARF: 0xBCBA23
+    } debris[32]; // Offset: 0x8
 };
 
 // Size: 0x8

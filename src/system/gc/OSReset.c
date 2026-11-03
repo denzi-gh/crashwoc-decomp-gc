@@ -1,324 +1,180 @@
-#include "types.h"
+#include "dolphin.h"
+#include "dolphin/os.h"
+#include "dolphin/pad.h"
 
-typedef int BOOL;
-#define TRUE 1
-#define FALSE 0
+#include "__os.h"
 
-typedef void (*OSResetCallback)(void);
+#define ENQUEUE_INFO(info, queue)                            \
+    do {                                                     \
+        struct OSResetFunctionInfo * __prev = (queue)->tail; \
+        if (__prev == 0) {                                   \
+            (queue)->head = (info);                          \
+        } else {                                             \
+            __prev->next = (info);                           \
+        }                                                    \
+        (info)->prev = __prev;                               \
+        (info)->next = 0;                                    \
+        (queue)->tail = (info);                              \
+    } while(0);
 
-typedef struct OSResetFunctionInfo {
-    int (*func)(int);
-    u32 priority;
-    struct OSResetFunctionInfo* next;
-    struct OSResetFunctionInfo* prev;
-} OSResetFunctionInfo;
+#define ENQUEUE_INFO_PRIO(info, queue)               \
+    do {                                             \
+        struct OSResetFunctionInfo * __prev;         \
+        struct OSResetFunctionInfo * __next;         \
+        for(__next = (queue)->head; __next           \
+          && (__next->priority <= (info)->priority); \
+                __next = __next->next) ;             \
+                                                     \
+        if (__next == 0) {                           \
+            ENQUEUE_INFO(info, queue);               \
+        } else {                                     \
+            (info)->next = __next;                   \
+            __prev = __next->prev;                   \
+            __next->prev = (info);                   \
+            (info)->prev = __prev;                   \
+            if (__prev == 0) {                       \
+                (queue)->head = (info);              \
+            } else {                                 \
+                __prev->next = (info);               \
+            }                                        \
+        }                                            \
+    } while(0);
 
-typedef struct OSThread OSThread;
-struct OSThread {
-    char context[0x2C8];
-    u16 state;
-    u16 attr;
-    s32 suspend;
-    s32 priority;
-    s32 base;
-    void* val;
-    void* queue;
-    struct { OSThread* next; OSThread* prev; } link;
-    struct { OSThread* head; OSThread* tail; } queueJoin;
-    void* mutex;
-    struct { void* head; void* tail; } queueMutex;
-    struct { OSThread* next; OSThread* prev; } linkActive;
-};
+static struct OSResetFunctionQueue ResetFunctionQueue;
 
-s32 OSDisableInterrupts(void);
-s32 OSRestoreInterrupts(s32);
-void __OSStopAudioSystem(void);
-void OSDisableScheduler(void);
-void OSEnableScheduler(void);
-BOOL __PADDisableRecalibration(BOOL);
-void ICFlashInvalidate(void);
-void LCDisable(void);
-BOOL __OSSyncSram(void);
-void* __OSLockSram(void);
-BOOL __OSUnlockSram(BOOL);
-void __OSMaskInterrupts(u32);
-void OSCancelThread(OSThread*);
-void __OSReboot(u32, u32);
-s64 __OSGetSystemTime(void);
-s64 __div2i(s64, s64);
+static int CallResetFunctions(int final);
+static asm void Reset(unsigned long resetCode);
 
-#define OS_BUS_CLOCK (*(volatile u32*)0x800000F8)
-#define OS_TIMER_CLOCK (OS_BUS_CLOCK / 4)
+void OSRegisterResetFunction(struct OSResetFunctionInfo * info) {
+    ASSERTLINE(0x76, info->func);
 
-extern s32 Down;
-extern OSResetCallback ResetCallback;
-extern s32 LastState;
-extern s64 HoldUp;
-extern s64 HoldDown;
-extern s64 __OSStartTime;
+    ENQUEUE_INFO_PRIO(info, &ResetFunctionQueue);
+}
 
-static OSResetFunctionInfo* ResetFunctionQueue;
+static int CallResetFunctions(int final) {
+    struct OSResetFunctionInfo * info;
+    int err = 0;
 
-static void Reset(u32 resetCode) {
-    /* Cannot be implemented in pure C - requires mfspr/mtspr/isync/sync/mftb */
+    for(info = ResetFunctionQueue.head; info; info = info->next) {
+        err |= !info->func(final);
+    }
+    err |= !__OSSyncSram();
+    if (err) {
+        return 0;
+    }
+    return 1;
+}
+
+static asm void Reset(unsigned long resetCode) {
+    nofralloc
+    b L_000001BC
+L_000001A0:
+    mfspr r8, HID0
+    ori r8, r8, 0x8
+    mtspr HID0, r8
+    isync
+    sync
+    nop
+    b L_000001C0
+L_000001BC:
+    b L_000001DC
+L_000001C0:
+    mftb r5, 268
+L_000001C4:
+    mftb r6, 268
+    subf r7, r5, r6
+    cmplwi r7, 0x1124
+    blt L_000001C4
+    nop
+    b L_000001E0
+L_000001DC:
+    b L_000001FC
+L_000001E0:
+    lis r8, 0xcc00
+    ori r8, r8, 0x3000
+    li r4, 0x3
+    stw r4, 0x24(r8)
+    stw r3, 0x24(r8)
+    nop
+    b L_00000200
+L_000001FC:
+    b L_00000208
+L_00000200:
+    nop
+    b L_00000200
+L_00000208:
+    b L_000001A0
 }
 
 void __OSDoHotReset(u32 resetCode) {
     OSDisableInterrupts();
-    *(volatile u16*)0xCC002002 = 0;
+    __VIRegs[1] = 0;
     ICFlashInvalidate();
-    Reset(resetCode << 3);
+    Reset(resetCode * 8);
 }
 
-void OSResetSystem(int reset, u32 resetCode, BOOL forceMenu) {
-    BOOL padRecal;
-    OSResetFunctionInfo* info;
-    BOOL retVal;
-    BOOL complete;
+static void KillThreads(void) {
     OSThread* thread;
     OSThread* next;
-    u32* base;
+
+    for (thread = __OSActiveThreadQueue.head; thread; thread = next) {
+        next = thread->linkActive.next;
+        switch (thread->state) {
+        case OS_THREAD_STATE_READY:
+        case OS_THREAD_STATE_WAITING:
+            OSCancelThread(thread);
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+void OSResetSystem(int reset, unsigned long resetCode, int forceMenu) {
+    int rc;
+    int disableRecalibration;
+    struct OSSram * sram;
+    u8 padding[8];
 
     OSDisableScheduler();
     __OSStopAudioSystem();
 
-    if (reset == 2) {
-        padRecal = __PADDisableRecalibration(TRUE);
+    if (reset == OS_RESET_SHUTDOWN) {
+        disableRecalibration = __PADDisableRecalibration(TRUE);
     }
 
-    while (TRUE) {
-        while (TRUE) {
-            info = ResetFunctionQueue;
-            retVal = FALSE;
+    do {} while (CallResetFunctions(0) == 0);
 
-            while (TRUE) {
-                while (info != NULL) {
-                    if (!info->func(FALSE)) {
-                        retVal = TRUE;
-                    }
-                    info = info->next;
-                }
-
-                if (!__OSSyncSram()) {
-                    retVal = TRUE;
-                }
-
-                if (retVal == FALSE) {
-                    complete = TRUE;
-                } else {
-                    complete = FALSE;
-                }
-
-                if (complete) break;
-                break;
-            }
-            if (complete) break;
-        }
-        break;
+    if (reset == OS_RESET_HOTRESET && forceMenu) {
+        sram = __OSLockSram();
+        sram->flags |= 0x40;
+        __OSUnlockSram(1);
+        do {} while(__OSSyncSram() == 0);
     }
-
-    if (reset == 1 && forceMenu != 0) {
-        u8* sram = (u8*)__OSLockSram();
-        sram[0x13] |= 0x40;
-        __OSUnlockSram(TRUE);
-
-        while (TRUE) {
-            while (!__OSSyncSram())
-                ;
-            break;
-        }
-    }
-
     OSDisableInterrupts();
-    info = (OSResetFunctionInfo*)ResetFunctionQueue;
-    retVal = FALSE;
-
-    while (TRUE) {
-        while (info != NULL) {
-            if (!info->func(TRUE)) {
-                retVal = TRUE;
-            }
-            info = info->next;
-        }
-        break;
-    }
-
-    __OSSyncSram();
+    rc = CallResetFunctions(1);
+    ASSERTLINE(0x117, rc);
     LCDisable();
-
-    if (reset == 1) {
-        OSDisableInterrupts();
-        *(volatile u16*)0xCC002002 = 0;
-        ICFlashInvalidate();
-        Reset(resetCode << 3);
-    } else if (reset == 0) {
-        thread = *(OSThread* volatile*)0x800000DC;
-
-        while (TRUE) {
-            while (thread != NULL) {
-                u16 state = thread->state;
-                next = thread->linkActive.next;
-                if (state == 4 || state == 1) {
-                    OSCancelThread(thread);
-                }
-                thread = next;
-            }
-            break;
-        }
-
+    if (reset == OS_RESET_HOTRESET) {
+        __OSDoHotReset(resetCode);
+    } else if (reset == OS_RESET_RESTART) {
+        KillThreads();
         OSEnableScheduler();
         __OSReboot(resetCode, forceMenu);
     }
+    KillThreads();
+    memset(OSPhysicalToCached(0x40), 0, 0xCC - 0x40);
+    memset(OSPhysicalToCached(0xD4), 0, 0xE8 - 0xD4);
+    memset(OSPhysicalToCached(0xF4), 0, 0xF8 - 0xF4);
+    memset(OSPhysicalToCached(0x3000), 0, 0xC0);
+    memset(OSPhysicalToCached(0x30C8), 0, 0x30D4 - 0x30C8);
 
-    thread = *(OSThread* volatile*)0x800000DC;
-
-    while (TRUE) {
-        while (thread != NULL) {
-            u16 state = thread->state;
-            next = thread->linkActive.next;
-            if (state == 4 || state == 1) {
-                OSCancelThread(thread);
-            }
-            thread = next;
-        }
-        break;
-    }
-
-    base = (u32*)0x80000000;
-    memset(base + 0x10, 0, 0x8C);
-    memset(base + 0x35, 0, 0x14);
-    memset(base + 0x3D, 0, 0x4);
-    memset((void*)(base + 0xC00), 0, 0xC0);
-    memset((void*)(base + 0xC32), 0, 0xC);
-
-    __PADDisableRecalibration(padRecal);
+    __PADDisableRecalibration(disableRecalibration);
 }
 
-u32 OSGetResetCode(void) {
-    if (*(volatile u8*)0x800030E2 != 0) {
-        return (u32)0x80000000;
+unsigned long OSGetResetCode() {
+    if (*(u8*)OSPhysicalToCached(0x30E2)) {
+        return 0x80000000;
     }
-    return (*(volatile u32*)0xCC003024 & ~0x7) >> 3;
-}
-
-void __OSResetSWInterruptHandler(void) {
-    s64 now;
-    u32 threshold;
-
-    now = __OSGetSystemTime();
-    HoldDown = now;
-
-    threshold = OS_TIMER_CLOCK / 10000;
-
-    while (TRUE) {
-        s64 elapsed;
-        now = __OSGetSystemTime();
-        elapsed = now - HoldDown;
-
-        if (elapsed >= (s64)threshold) break;
-        if (*(volatile u32*)0xCC003000 & 0x00010000) break;
-    }
-
-    if (!(*(volatile u32*)0xCC003000 & 0x00010000)) {
-        Down = TRUE;
-        LastState = TRUE;
-        __OSMaskInterrupts(0x200);
-
-        if (ResetCallback != NULL) {
-            OSResetCallback cb = ResetCallback;
-            ResetCallback = NULL;
-            cb();
-        }
-    }
-
-    *(volatile u32*)0xCC003000 = 2;
-}
-
-BOOL OSGetResetButtonState(void) {
-    BOOL result;
-    s32 old;
-    s64 now;
-
-    old = OSDisableInterrupts();
-    now = __OSGetSystemTime();
-
-    if (!(*(volatile u32*)0xCC003000 & 0x00010000)) {
-        if (Down == 0) {
-            BOOL valid = TRUE;
-            if (HoldUp != 0) {
-                valid = FALSE;
-            }
-            Down = TRUE;
-            result = valid;
-            HoldDown = now;
-        } else {
-            BOOL valid = TRUE;
-            if (HoldUp == 0) {
-                u32 busClock = OS_BUS_CLOCK;
-                u32 timerClock = busClock >> 2;
-                u32 ticks100 = timerClock / 125000;
-                s64 elapsed = now - HoldDown;
-                ticks100 *= 100;
-                ticks100 >>= 3;
-                if (elapsed < (s64)ticks100) {
-                    valid = FALSE;
-                }
-            }
-            if (valid) {
-                result = TRUE;
-            } else {
-                result = FALSE;
-            }
-        }
-    } else {
-        if (Down != 0) {
-            s32 last = LastState;
-            Down = 0;
-            result = last;
-            if (last) {
-                HoldUp = now;
-            } else {
-                HoldUp = 0;
-            }
-        } else {
-            if (HoldUp != 0) {
-                u32 busClock = *(volatile u32*)0x800000F8;
-                u32 timerClock = busClock >> 2;
-                u32 holdThreshold = timerClock / 1000 * 40;
-                s64 elapsed = now - HoldUp;
-
-                if (elapsed >= (s64)holdThreshold) {
-                    result = TRUE;
-                } else {
-                    HoldUp = 0;
-                    result = FALSE;
-                }
-            } else {
-                HoldUp = 0;
-                result = FALSE;
-            }
-        }
-    }
-
-    LastState = result;
-
-    {
-        u8 bootByte = *(volatile u8*)0x800030E3;
-        if (bootByte & 0x3F) {
-            u32 timerClock = OS_TIMER_CLOCK;
-            s64 deadline = __OSStartTime + (s64)timerClock * (s64)(bootByte & 0x3F) * 60;
-            if (now >= deadline) {
-                s64 diff = now - deadline;
-                s64 halved = diff / timerClock / 2;
-                if ((halved & 1) == 0) {
-                    result = TRUE;
-                } else {
-                    result = FALSE;
-                }
-            }
-        }
-    }
-
-    OSRestoreInterrupts(old);
-    return result;
+    return (__PIRegs[9] & 0xFFFFFFF8) / 8;
 }
