@@ -513,7 +513,6 @@ config.libs = [
             Object(NonMatching, "stats.c", source="system/gc/stats.c"),
             Object(NonMatching, "gcStats.c", source="system/gc/gcStats.c"),
             Object(NonMatching, "fs.c", source="system/gc/fs.c"),
-            Object(NonMatching, "pad.c", source="system/gc/pad.c"),
             Object(NonMatching, "syfont.c", source="system/gc/syfont.c"),
             Object(NonMatching, "gs.c", source="system/gs/gs.c"),
             Object(NonMatching, "gsbuffer.c", source="system/gs/gsbuffer.c"),
